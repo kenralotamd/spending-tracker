@@ -67,7 +67,7 @@ export default function Tracker() {
   const [from, setFrom] = useState<string>('');
   const [to, setTo] = useState<string>('');
   const [onlySpending, setOnlySpending] = useState(true);
-  const [budgets, setBudgets] = useState<Record<string, number>>({});
+  const [, setBudgets] = useState<Record<string, number>>({});
   const [negativesAreSpend, setNegativesAreSpend] = useState<boolean>(() => {
     try { return localStorage.getItem(LS_NEG_SPEND) ? localStorage.getItem(LS_NEG_SPEND) === '1' : true; } catch { return true; }
   });
@@ -266,15 +266,19 @@ export default function Tracker() {
         return;
       }
       Papa.parse(file, {
-        header: true, skipEmptyLines: true,
-        complete: (res) => {
-          const rows = res.data as any[];
-          if (!rows.length) { alert('No rows found.'); return; }
-          const headers = res.meta.fields || Object.keys(rows[0]);
-          openPreview(headers, rows);
-        },
-        error: (err) => { alert('CSV parse error: ' + err.message); console.error(err); }
-      });
+  header: true,
+  skipEmptyLines: true,
+  complete: (res: Papa.ParseResult<any>) => {
+    const rows = res.data as any[];
+    if (!rows.length) { alert('No rows found.'); return; }
+    const headers = res.meta.fields || Object.keys(rows[0]);
+    openPreview(headers, rows);
+  },
+  error: (err: Papa.ParseError) => {
+    alert('CSV parse error: ' + err.message);
+    console.error(err);
+  }
+});
     } catch (e: any) {
       alert(e?.message || 'Import failed'); console.error(e);
     }
