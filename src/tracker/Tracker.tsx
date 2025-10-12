@@ -74,6 +74,18 @@ export default function Tracker() {
     try { return localStorage.getItem(LS_NEG_SPEND) ? localStorage.getItem(LS_NEG_SPEND) === '1' : true; } catch { return true; }
   });
 
+  /** ---------- Monthly dashboard state ---------- */
+  const [dashTab, setDashTab] = useState<'current' | 'archive'>('current');
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
+
+  function yyyymm(d: string) { return (d || '').slice(0, 7); }
+  function formatMonth(ym: string) {
+    if (!ym || ym.length < 7) return ym || '';
+    const [y, m] = ym.split('-');
+    const dt = new Date(Number(y), Number(m) - 1, 1);
+    return dt.toLocaleString('en-AU', { month: 'long', year: 'numeric' });
+  }
+
   /** ---------- Manual add form ---------- */
   const [form, setForm] = useState<Partial<Txn>>({
     date: new Date().toISOString().slice(0,10),
@@ -166,6 +178,33 @@ export default function Tracker() {
       .sort((a,b)=>b.spend-a.spend);
     return { totalOut, catRows };
   }, [filtered]);
+
+  /** ---------- Monthly groupings ---------- */
+  const spendingTxns = useMemo(() => txns.filter(t => (onlySpending ? t.amount > 0 : true)), [txns, onlySpending]);
+
+  const monthsList = useMemo(() => {
+    const map: Record<string, { total: number; byCat: Record<string, number> }> = {};
+    for (const t of spendingTxns) {
+      const m = yyyymm(t.date);
+      if (!m) continue;
+      if (!map[m]) map[m] = { total: 0, byCat: {} };
+      const amt = Math.max(0, t.amount);
+      map[m].total += amt;
+      const c = t.category || 'Uncategorized';
+      map[m].byCat[c] = (map[m].byCat[c] || 0) + amt;
+    }
+    const arr = Object.entries(map).map(([month, data]) => ({ month, total: data.total, byCat: data.byCat }));
+    arr.sort((a, b) => b.month.localeCompare(a.month)); // newest first
+    return arr;
+  }, [spendingTxns]);
+
+  const currentMonthData = useMemo(() => {
+    const found = monthsList.find(m => m.month === selectedMonth) || { month: selectedMonth, total: 0, byCat: {} as Record<string, number> };
+    const catRows = Object.entries(found.byCat)
+      .map(([category, spend]) => ({ category, spend, pct: found.total ? (spend / found.total * 100) : 0 }))
+      .sort((a, b) => b.spend - a.spend);
+    return { totalOut: found.total, catRows };
+  }, [monthsList, selectedMonth]);
 
   /** ---------- Household actions ---------- */
   async function onSelectHousehold(id: string) {
@@ -393,11 +432,11 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
   const summaryRef = useRef<HTMLDivElement | null>(null);
 
   const pieData = useMemo(() => {
-    const labels = totals.catRows.map(r => r.category);
-    const values = totals.catRows.map(r => r.spend);
-    const colors = totals.catRows.map((r) => catColorMap[r.category] || '#999');
+    const labels = currentMonthData.catRows.map(r => r.category);
+    const values = currentMonthData.catRows.map(r => r.spend);
+    const colors = currentMonthData.catRows.map((r) => catColorMap[r.category] || '#999');
     return { labels, values, colors };
-  }, [totals.catRows, catColorMap]);
+  }, [currentMonthData.catRows, catColorMap]);
 
   useEffect(() => {
     if (!pieRef.current) return;
@@ -617,45 +656,93 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
         <div style={{ fontSize: 18, fontWeight: 600 }}>Total spend: ${totals.totalOut.toFixed(2)}</div>
       </section>
 
-      {/* Summary with Pie + Table + Export */}
+      {/* Monthly Summary Dashboard */}
       <section ref={summaryRef} style={{ marginTop: 20, ...box }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 8 }}>
-          <h3 style={{ margin:0 }}>Spending Summary</h3>
-          <button onClick={exportSummaryPDF}>Export as PDF</button>
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
-          <div style={{ minHeight: 280 }}>
-            <canvas ref={pieRef} />
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+            <button onClick={() => setDashTab('current')} disabled={dashTab === 'current'}>This Month</button>
+            <button onClick={() => setDashTab('archive')} disabled={dashTab === 'archive'}>Other Months</button>
           </div>
-          <div>
-            <table style={{ width:'100%', fontSize: 14, borderCollapse:'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign:'left', borderBottom:'1px solid #eee', padding:'6px' }}>Category</th>
-                  <th style={{ textAlign:'right', borderBottom:'1px solid #eee', padding:'6px' }}>Spend (AUD)</th>
-                  <th style={{ textAlign:'right', borderBottom:'1px solid #eee', padding:'6px' }}>%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {totals.catRows.map((r) => (
-                  <tr key={r.category}>
-                    <td style={{ padding:'6px' }}>
-                      <span style={{ display:'inline-flex', alignItems:'center', gap:8 }}>
-                        <span style={{ width:10, height:10, borderRadius:999, background: catColorMap[r.category] }} />
-                        {r.category}
-                      </span>
-                    </td>
-                    <td style={{ padding:'6px', textAlign:'right' }}>${r.spend.toFixed(2)}</td>
-                    <td style={{ padding:'6px', textAlign:'right' }}>{r.pct.toFixed(1)}%</td>
+          {dashTab === 'current' && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+              <button
+                onClick={() => {
+                  const idx = monthsList.findIndex(m => m.month === selectedMonth);
+                  const next = monthsList[idx + 1];
+                  if (next) setSelectedMonth(next.month);
+                }}
+                disabled={monthsList.findIndex(m => m.month === selectedMonth) === monthsList.length - 1 || monthsList.length === 0}
+                title="Previous"
+              >◀</button>
+              <div style={{ fontWeight: 600 }}>{formatMonth(selectedMonth) || 'This Month'}</div>
+              <button
+                onClick={() => {
+                  const idx = monthsList.findIndex(m => m.month === selectedMonth);
+                  const prev = monthsList[idx - 1];
+                  if (prev) setSelectedMonth(prev.month);
+                }}
+                disabled={monthsList.findIndex(m => m.month === selectedMonth) <= 0}
+                title="Next"
+              >▶</button>
+              <button onClick={exportSummaryPDF} style={{ marginLeft: 8 }}>Export PDF</button>
+            </div>
+          )}
+        </div>
+
+        {dashTab === 'current' ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 12 }}>
+            <div style={{ minHeight: 280 }}>
+              <canvas ref={pieRef} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Total spend: ${currentMonthData.totalOut.toFixed(2)}</div>
+              <table style={{ width: '100%', fontSize: 14, borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: 'left', borderBottom: '1px solid #eee', padding: '6px' }}>Category</th>
+                    <th style={{ textAlign: 'right', borderBottom: '1px solid #eee', padding: '6px' }}>Spend (AUD)</th>
+                    <th style={{ textAlign: 'right', borderBottom: '1px solid #eee', padding: '6px' }}>%</th>
                   </tr>
-                ))}
-                {!totals.catRows.length && (
-                  <tr><td colSpan={3} style={{ padding:'8px', color:'#888' }}>No data yet</td></tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {currentMonthData.catRows.map((r) => (
+                    <tr key={r.category}>
+                      <td style={{ padding: '6px' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ width: 10, height: 10, borderRadius: 999, background: catColorMap[r.category] }} />
+                          {r.category}
+                        </span>
+                      </td>
+                      <td style={{ padding: '6px', textAlign: 'right' }}>${r.spend.toFixed(2)}</td>
+                      <td style={{ padding: '6px', textAlign: 'right' }}>{r.pct.toFixed(1)}%</td>
+                    </tr>
+                  ))}
+                  {!currentMonthData.catRows.length && (
+                    <tr><td colSpan={3} style={{ padding: '8px', color: '#888' }}>No data yet</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+              {monthsList.map(m => (
+                <button
+                  key={m.month}
+                  onClick={() => { setSelectedMonth(m.month); setDashTab('current'); }}
+                  style={{ textAlign: 'left', padding: 12, border: '1px solid #ddd', borderRadius: 8, background: '#fff' }}
+                >
+                  <div style={{ fontWeight: 600 }}>{formatMonth(m.month)}</div>
+                  <div style={{ color: '#666' }}>Total: ${m.total.toFixed(2)}</div>
+                </button>
+              ))}
+              {!monthsList.length && (
+                <div style={{ color: '#888' }}>No months to show yet.</div>
+              )}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Transactions table */}
