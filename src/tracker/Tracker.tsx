@@ -274,9 +274,11 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
     const headers = res.meta.fields || Object.keys(rows[0]);
     openPreview(headers, rows);
   },
-  error: (err: Papa.ParseError) => {
-    alert('CSV parse error: ' + err.message);
-    console.error(err);
+  // ⬇️ change this bit
+  error: (error: Error, _file: Papa.LocalFile | string) => {
+    const msg = (error as any)?.message || String(error);
+    alert('CSV parse error: ' + msg);
+    console.error(error);
   }
 });
     } catch (e: any) {
