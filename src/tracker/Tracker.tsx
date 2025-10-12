@@ -464,7 +464,7 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
 
   /** ---------- Render ---------- */
   return (
-    <div style={{ padding: 24, maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ padding: 16, maxWidth: 960, margin: '0 auto', boxSizing: 'border-box' }}>
       <div style={{ padding: 12, borderBottom: '1px solid #eee', display:'flex', justifyContent:'space-between' }}>
         <div><strong>Spending Tracker</strong></div>
         <div />
@@ -475,21 +475,55 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
       {bootLoading && <div style={{marginTop:8, padding:8, background:'#fffbe6', border:'1px solid #ffe58f', borderRadius:6}}>Setting up your household…</div>}
       {householdError && <div style={{marginTop:8, padding:8, background:'#fff1f0', border:'1px solid #ffa39e', borderRadius:6}}>{householdError}</div>}
       {householdId && (
-        <div style={{...box, marginTop:8, display:'flex', alignItems:'center', gap:12}}>
-          <div>Active household:</div>
-          <select value={householdId} onChange={e => onSelectHousehold(e.target.value)}>
-            {households.map(h => <option key={h.id} value={h.id}>{h.name} ({h.id.slice(0,8)})</option>)}
-          </select>
-          <button onClick={onCreateHousehold}>Create new household</button>
-          <label style={{ marginLeft: 'auto', display:'flex', alignItems:'center', gap:6 }}>
-            <input
-              type="checkbox"
-              checked={negativesAreSpend}
-              onChange={e=>{ setNegativesAreSpend(e.target.checked); localStorage.setItem('negatives_are_spend', e.target.checked ? '1' : '0'); }}
-            />
-            Negatives are spending (ignore credits)
-          </label>
-        </div>
+  <div
+  style={{
+    ...box,
+    marginTop: 8,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    flexWrap: 'wrap', // ✅ allows wrapping on mobile
+  }}
+  className="card"
+>
+  <div style={{ minWidth: '120px' }}>Active household:</div>
+  <select
+    value={householdId}
+    onChange={e => onSelectHousehold(e.target.value)}
+    style={{ flex: '1 1 auto', minWidth: '150px' }}
+  >
+    {households.map(h => (
+      <option key={h.id} value={h.id}>
+        {h.name} ({h.id.slice(0, 8)})
+      </option>
+    ))}
+  </select>
+
+  <button style={{ flex: '0 0 auto' }} onClick={onCreateHousehold}>
+    Create new household
+  </button>
+
+  <label
+    className="wrap"
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6,
+      marginLeft: 'auto',
+      flex: '1 1 100%', // ✅ pushes checkbox to new line on mobile
+    }}
+  >
+    <input
+      type="checkbox"
+      checked={negativesAreSpend}
+      onChange={e => {
+        setNegativesAreSpend(e.target.checked);
+        localStorage.setItem('negatives_are_spend', e.target.checked ? '1' : '0');
+      }}
+    />
+    Negatives are spending (ignore credits)
+  </label>
+</div>
       )}
 
       {/* Entry row */}
