@@ -52,6 +52,7 @@ function colorFor(_category: string, orderIndex: number, colorFromDb?: string | 
 }
 
 export default function Tracker() {
+  const [showCategories, setShowCategories] = useState(false);
   /** ---------- Household ---------- */
   const [householdId, setHouseholdId] = useState<string | null>(null);
   const [households, setHouseholds] = useState<{id:string; name:string}[]>([]);
@@ -558,6 +559,7 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
               const v = e.target.value;
               setForm(f => ({ ...f, amount: v === '' ? undefined : Number(v) }));
             }}
+            style={{ width: '100%' }}
           />
         </div>
         <div style={{ gridColumn: 'span 3' }}>
@@ -579,13 +581,15 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
           <input type="checkbox" checked={onlySpending} onChange={e=>setOnlySpending(e.target.checked)} />
           Show only spending
         </div>
-        <div style={{ gridColumn: 'span 2', minWidth: 200, flex: '1 1 100%' }}>
-          <label>From</label>
-          <input type="date" value={from} onChange={e=>setFrom(e.target.value)} />
-        </div>
-        <div style={{ gridColumn: 'span 2', minWidth: 200, flex: '1 1 100%' }}>
-          <label>To</label>
-          <input type="date" value={to} onChange={e=>setTo(e.target.value)} />
+        <div style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ flex: '1 1 160px', minWidth: '160px' }}>
+            <label>From</label>
+            <input type="date" value={from} onChange={e => setFrom(e.target.value)} style={{ width: '100%' }} />
+          </div>
+          <div style={{ flex: '1 1 160px', minWidth: '160px' }}>
+            <label>To</label>
+            <input type="date" value={to} onChange={e => setTo(e.target.value)} style={{ width: '100%' }} />
+          </div>
         </div>
       </section>
 
@@ -693,51 +697,58 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
 
       {/* Categories manager */}
       <section style={{ marginTop: 24 }}>
-        <h3>Categories</h3>
-        <div style={{ ...box }}>
-          {!cats.length && (
-            <div style={{ marginBottom: 8 }}>
-              <button onClick={async ()=>{
-                if (!householdId) return;
-                await seedDefaultCategories(householdId);
-                setCats(await listCategories(householdId));
-              }}>Seed default categories</button>
-            </div>
-          )}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto auto', gap:8, alignItems:'center' }}>
-            {cats.map((c, idx) => (
-              <div key={c.id} style={{ display:'contents' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                  <span style={{ width:12, height:12, borderRadius:999, background: colorFor(c.name, idx, c.color ?? undefined) }} />
-                  {c.name}
-                </div>
-                <input
-                  type="color"
-                  value={(c.color as string) || colorFor(c.name, idx, c.color ?? undefined)}
-                  onChange={e=>onSetColor(c, e.target.value)}
-                  title="Pick color"
-                  style={{ width:36, height:28, padding:0, border:'1px solid #ddd', borderRadius:6, background:'#fff' }}
-                />
-                <button onClick={()=>onRenameCategory(c)}>Rename</button>
-                <button onClick={()=>onDeleteCategory(c)}>Delete</button>
-              </div>
-            ))}
-            <div style={{ display:'contents', marginTop: 6 }}>
-              <input
-                placeholder="New category name"
-                value={newCat}
-                onChange={e=>setNewCat(e.target.value)}
-              />
-              <div />
-              <button onClick={onAddCategory}>Add</button>
-              <div />
-            </div>
-          </div>
-          <div style={{ marginTop: 8, fontSize: 12, color:'#777' }}>
-            • You can’t delete a category that’s used by any transactions or budgets.
-            • Renaming will migrate existing transactions and the matching budget row.
-          </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0 }}>Categories</h3>
+          <button onClick={() => setShowCategories(!showCategories)}>
+            {showCategories ? 'Hide' : 'Show'}
+          </button>
         </div>
+        {showCategories && (
+          <div style={{ ...box, marginTop: 8 }}>
+            {!cats.length && (
+              <div style={{ marginBottom: 8 }}>
+                <button onClick={async ()=>{
+                  if (!householdId) return;
+                  await seedDefaultCategories(householdId);
+                  setCats(await listCategories(householdId));
+                }}>Seed default categories</button>
+              </div>
+            )}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto auto', gap:8, alignItems:'center' }}>
+              {cats.map((c, idx) => (
+                <div key={c.id} style={{ display:'contents' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <span style={{ width:12, height:12, borderRadius:999, background: colorFor(c.name, idx, c.color ?? undefined) }} />
+                    {c.name}
+                  </div>
+                  <input
+                    type="color"
+                    value={(c.color as string) || colorFor(c.name, idx, c.color ?? undefined)}
+                    onChange={e=>onSetColor(c, e.target.value)}
+                    title="Pick color"
+                    style={{ width:36, height:28, padding:0, border:'1px solid #ddd', borderRadius:6, background:'#fff' }}
+                  />
+                  <button onClick={()=>onRenameCategory(c)}>Rename</button>
+                  <button onClick={()=>onDeleteCategory(c)}>Delete</button>
+                </div>
+              ))}
+              <div style={{ display:'contents', marginTop: 6 }}>
+                <input
+                  placeholder="New category name"
+                  value={newCat}
+                  onChange={e=>setNewCat(e.target.value)}
+                />
+                <div />
+                <button onClick={onAddCategory}>Add</button>
+                <div />
+              </div>
+            </div>
+            <div style={{ marginTop: 8, fontSize: 12, color:'#777' }}>
+              • You can’t delete a category that’s used by any transactions or budgets.
+              • Renaming will migrate existing transactions and the matching budget row.
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Import preview modal */}
