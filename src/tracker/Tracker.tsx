@@ -19,7 +19,7 @@ import {
 } from '../categories';
 
 /** ======= UI helpers ======= */
-const row = { display: 'grid', gap: 12, gridTemplateColumns: 'repeat(12, 1fr)', alignItems: 'end' } as const;
+const row = { display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', alignItems: 'end' } as const;
 const box = { border: '1px solid #eee', borderRadius: 8, padding: 12 } as const;
 
 const LS_NEG_SPEND = 'negatives_are_spend';
@@ -559,13 +559,15 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
             </select>
           </div>
         </div>
-        <div style={{ gridColumn: 'span 5', display: 'flex', alignItems: 'end', gap: 8 }}>
+        {/* Add, Import, and Show only spending controls split into two blocks */}
+        <div style={{ gridColumn: 'span 5', display: 'flex', flexWrap:'wrap', alignItems: 'end', gap: 8 }} className="btn-row">
           <button onClick={onAdd}>Add</button>
           <input type="file" accept=".csv,.xlsx,.xls" onChange={e=>{ const f=e.target.files?.[0]; if (f) onImport(f); }} />
-          <label style={{ display:'flex', alignItems:'center', gap:6, marginLeft: 8 }}>
-            <input type="checkbox" checked={onlySpending} onChange={e=>setOnlySpending(e.target.checked)} />
-            Show only spending
-          </label>
+        </div>
+
+        <div className="full-on-mobile" style={{ display:'flex', alignItems:'center', gap: 6 }}>
+          <input type="checkbox" checked={onlySpending} onChange={e=>setOnlySpending(e.target.checked)} />
+          Show only spending
         </div>
         <div style={{ gridColumn: 'span 2' }}>
           <label>From</label>
@@ -626,7 +628,7 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
       {/* Transactions table */}
       <section style={{ marginTop: 20 }}>
         <h3>Transactions</h3>
-        <div style={{ maxHeight: '60vh', overflow: 'auto', border: '1px solid #eee', borderRadius: 8 }}>
+        <div style={{ maxHeight: '60vh', overflowX: 'auto', overflowY: 'auto', border: '1px solid #eee', borderRadius: 8, width:'100%' }} className="card">
           <table style={{ width: '100%', fontSize: 14 }}>
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '1px solid #eee' }}>
