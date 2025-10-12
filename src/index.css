@@ -86,3 +86,74 @@ button:disabled {
     width: 100%;
   }
 }
+/* ---- Mobile layout polish ---- */
+@media (max-width: 768px) {
+  /* prevent iOS zoom on inputs */
+  input, select, button, textarea { font-size: 16px !important; }
+
+  /* cards & containers breathe */
+  .card, section { width: 100%; box-sizing: border-box; }
+
+  /* tables scroll horizontally instead of blowing the layout */
+  table { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  th, td { white-space: nowrap; }
+
+  /* buttons line up nicely */
+  .btn-row { display: flex; gap: 8px; width: 100%; }
+  .btn-row > * { flex: 1 1 auto; }
+
+  /* long labels wrap properly */
+  .wrap { white-space: normal !important; line-height: 1.25; }
+}
+
+/* allow light theme to stay readable everywhere */
+body { background: #fff !important; color: #000 !important; }
+/* ✅ Final visual fix for buttons & text */
+button {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border: 1px solid #ccc !important;
+}
+
+button:hover {
+  background-color: #f0f0f0 !important;
+  border-color: #999 !important;
+}
+
+/* Make form inputs and selects easier to read */
+input, select, textarea {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border: 1px solid #ccc !important;
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+/* Ensure page background stays white on mobile */
+html, body {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+/* Make everything fit nicely on iPhone screens */
+@media (max-width: 768px) {
+  body {
+    padding: 8px;
+    overflow-x: hidden;
+  }
+
+  section {
+    padding: 8px;
+  }
+
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+  }
+
+  th, td {
+    white-space: nowrap;
+  }
+}
