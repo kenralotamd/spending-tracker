@@ -471,6 +471,7 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
       </div>
 
       <h2 style={{ fontWeight: 700, fontSize: 22, textAlign:'center' }}>Spending Tracker — Cloud Sync</h2>
+      <div style={{ textAlign:'center', fontSize: 12, color: '#999', marginTop: 4 }}>Build: 2025-10-13c</div>
 
       {bootLoading && <div style={{marginTop:8, padding:8, background:'#fffbe6', border:'1px solid #ffe58f', borderRadius:6}}>Setting up your household…</div>}
       {householdError && <div style={{marginTop:8, padding:8, background:'#fff1f0', border:'1px solid #ffa39e', borderRadius:6}}>{householdError}</div>}
@@ -550,17 +551,19 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
           <label>Amount (AUD)</label>
           <input
             type="text"
+            name="amount"
+            autoComplete="off"
             inputMode="decimal"
             pattern="[0-9]*[.,]?[0-9]*"
             placeholder="0.00"
             value={form.amount == null ? '' : String(form.amount)}
-            onFocus={e => e.target.select()}
+            onFocus={e => e.currentTarget.select()}
             onChange={e => {
               const raw = e.target.value.replace(/[^0-9.,]/g, '');
               if (raw === '') {
                 setForm(f => ({ ...f, amount: undefined }));
                 return;
-              }
+                }
               const normalized = raw.replace(',', '.');
               const num = Number(normalized);
               if (!isNaN(num)) setForm(f => ({ ...f, amount: num }));
@@ -590,7 +593,7 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
             gap: 8,
             gridColumn: '1 / -1'
           }}
@@ -710,7 +713,7 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
 
       {/* Categories manager */}
       <section style={{ marginTop: 24 }}>
-        <details open={false} style={{ marginTop: 8 }} className="card">
+        <details open={true} style={{ marginTop: 8 }} className="card">
           <summary
             style={{
               cursor: 'pointer',
