@@ -685,6 +685,29 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
                 title="Next"
               >▶</button>
               <button onClick={exportSummaryPDF} style={{ marginLeft: 8 }}>Export PDF</button>
+              <button
+                onClick={async () => {
+                  if (!householdId) return alert('No household selected.');
+                  const confirmMsg = dashTab === 'current'
+                    ? `Are you sure you want to delete all transactions for ${formatMonth(selectedMonth)}?`
+                    : 'Are you sure you want to delete all transactions currently in view?';
+                  if (!window.confirm(confirmMsg)) return;
+                  try {
+                    const toDelete = txns.filter(t => yyyymm(t.date) === selectedMonth);
+                    for (const t of toDelete) {
+                      await deleteTransaction(t.id!);
+                    }
+                    setTxns(prev => prev.filter(t => yyyymm(t.date) !== selectedMonth));
+                    alert(`Deleted ${toDelete.length} transactions for ${formatMonth(selectedMonth)}.`);
+                  } catch (err) {
+                    console.error(err);
+                    alert('Failed to delete some transactions.');
+                  }
+                }}
+                style={{ marginLeft: 8, background: '#f44336', color: '#fff' }}
+              >
+                Clear All Transactions
+              </button>
             </div>
           )}
         </div>
