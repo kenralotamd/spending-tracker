@@ -265,7 +265,7 @@ export default function Tracker() {
         openPreview(headers, rows);
         return;
       }
-      Papa.parse(file, {
+Papa.parse<any>(file as unknown as Papa.LocalFile, {
   header: true,
   skipEmptyLines: true,
   complete: (res: Papa.ParseResult<any>) => {
