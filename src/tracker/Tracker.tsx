@@ -52,6 +52,8 @@ function colorFor(_category: string, orderIndex: number, colorFromDb?: string | 
 }
 
 export default function Tracker() {
+  // Collapsible state for Categories section
+  const [catsOpen, setCatsOpen] = useState(false);
   /** ---------- Household ---------- */
   const [householdId, setHouseholdId] = useState<string | null>(null);
   const [households, setHouseholds] = useState<{id:string; name:string}[]>([]);
@@ -554,9 +556,10 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
             name="amount"
             autoComplete="off"
             inputMode="decimal"
+            enterKeyHint="done"
             pattern="[0-9]*[.,]?[0-9]*"
             placeholder="0.00"
-            value={form.amount == null ? '' : String(form.amount)}
+            value={form.amount === undefined ? '' : String(form.amount)}
             onFocus={e => e.currentTarget.select()}
             onChange={e => {
               const raw = e.target.value.replace(/[^0-9.,]/g, '');
@@ -568,7 +571,7 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
               const num = Number(normalized);
               if (!isNaN(num)) setForm(f => ({ ...f, amount: num }));
             }}
-            style={{ width: '100%' }}
+            style={{ width: '100%', fontSize: '16px' }}
           />
         </div>
         <div style={{ gridColumn: 'span 3' }}>
@@ -585,24 +588,24 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
           <button onClick={onAdd}>Add</button>
           <input type="file" accept=".csv,.xlsx,.xls" onChange={e=>{ const f=e.target.files?.[0]; if (f) onImport(f); }} />
         </div>
-
         <div className="full-on-mobile" style={{ display:'flex', alignItems:'center', gap: 6 }}>
           <input type="checkbox" checked={onlySpending} onChange={e=>setOnlySpending(e.target.checked)} />
           Show only spending
         </div>
         <div
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            display: 'flex',
+            flexWrap: 'wrap',
             gap: 8,
-            gridColumn: '1 / -1'
+            justifyContent: 'space-between',
+            width: '100%',
           }}
         >
-          <div>
+          <div style={{ flex: '1 1 48%', minWidth: '160px' }}>
             <label>From</label>
             <input type="date" value={from} onChange={e => setFrom(e.target.value)} style={{ width: '100%' }} />
           </div>
-          <div>
+          <div style={{ flex: '1 1 48%', minWidth: '160px' }}>
             <label>To</label>
             <input type="date" value={to} onChange={e => setTo(e.target.value)} style={{ width: '100%' }} />
           </div>
@@ -713,16 +716,25 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
 
       {/* Categories manager */}
       <section style={{ marginTop: 24 }}>
-        <details open={true} style={{ marginTop: 8 }} className="card">
+        <details
+          open={catsOpen}
+          onToggle={(e) => setCatsOpen((e.target as HTMLDetailsElement).open)}
+          style={{ marginTop: 8, border: '1px solid #ddd', borderRadius: 8, padding: 8, background: '#fafafa' }}
+          className="card"
+        >
           <summary
             style={{
               cursor: 'pointer',
               fontWeight: 600,
               padding: '8px 0',
-              userSelect: 'none'
+              userSelect: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6
             }}
           >
-            Categories
+            <span>{catsOpen ? '▾' : '▸'}</span>
+            <span>Categories</span>
           </summary>
           <div style={{ ...box, marginTop: 8 }}>
             {!cats.length && (
@@ -893,6 +905,9 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
           </div>
         </div>
       )}
+      <footer style={{ textAlign: 'center', color: '#aaa', marginTop: 40, fontSize: 12 }}>
+        Spending Tracker © 2025 — Build: 2025-10-13g
+      </footer>
     </div>
   );
 }
