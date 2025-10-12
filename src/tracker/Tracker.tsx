@@ -76,7 +76,7 @@ export default function Tracker() {
   const [form, setForm] = useState<Partial<Txn>>({
     date: new Date().toISOString().slice(0,10),
     person: 'Both',
-    amount: 0,
+    amount: undefined,
     category: 'Uncategorized',
     source: 'manual'
   });
@@ -185,7 +185,7 @@ export default function Tracker() {
   async function onAdd() {
     try {
       if (!householdId) throw new Error('Household not ready yet.');
-      if (!form.date || !form.amount) throw new Error('Please enter a date and amount.');
+      if (!form.date || form.amount == null || isNaN(Number(form.amount))) throw new Error('Please enter a date and amount.');
       const t: Txn = {
         household_id: householdId,
         date: form.date!,
@@ -204,7 +204,7 @@ export default function Tracker() {
       setForm({
         date: new Date().toISOString().slice(0,10),
         person: form.person || 'Both',
-        amount: 0,
+        amount: undefined,
         category: form.category || 'Uncategorized',
         source: 'manual'
       });
@@ -548,7 +548,17 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
         </div>
         <div style={{ gridColumn: 'span 2' }}>
           <label>Amount (AUD)</label>
-          <input type="number" step="0.01" value={(form.amount as any) || 0} onChange={e=>setForm(f=>({ ...f, amount: Number(e.target.value) }))} />
+          <input
+            type="number"
+            step="0.01"
+            inputMode="decimal"
+            placeholder="0.00"
+            value={form.amount == null ? '' : String(form.amount)}
+            onChange={e => {
+              const v = e.target.value;
+              setForm(f => ({ ...f, amount: v === '' ? undefined : Number(v) }));
+            }}
+          />
         </div>
         <div style={{ gridColumn: 'span 3' }}>
           <label>Category</label>
@@ -569,11 +579,11 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
           <input type="checkbox" checked={onlySpending} onChange={e=>setOnlySpending(e.target.checked)} />
           Show only spending
         </div>
-        <div style={{ gridColumn: 'span 2' }}>
+        <div style={{ gridColumn: 'span 2', minWidth: 200, flex: '1 1 100%' }}>
           <label>From</label>
           <input type="date" value={from} onChange={e=>setFrom(e.target.value)} />
         </div>
-        <div style={{ gridColumn: 'span 2' }}>
+        <div style={{ gridColumn: 'span 2', minWidth: 200, flex: '1 1 100%' }}>
           <label>To</label>
           <input type="date" value={to} onChange={e=>setTo(e.target.value)} />
         </div>
