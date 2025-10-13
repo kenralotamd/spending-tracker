@@ -161,7 +161,7 @@ const list = await listMyHouseholds();
     (async () => {
       try {
         const [rows, b, c] = await Promise.all([
-          listTransactions(householdId, from || undefined, to || undefined),
+          listTransactions(householdId, from ?? '', to ?? ''),
           listBudgets(householdId),
           listCategories(householdId),
         ]);
@@ -466,7 +466,7 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
     await renameCategoryAndMigrate(c.household_id, c.id, c.name, name);
     setCats(await listCategories(c.household_id));
     // refresh txns/budgets in view
-    setTxns(await listTransactions(c.household_id, from || undefined, to || undefined));
+    setTxns(await listTransactions(c.household_id, from ?? '', to ?? ''));
     const b = await listBudgets(c.household_id);
     const map: Record<string, number> = {}; b.forEach(x => map[x.category] = Number(x.amount));
     setBudgets(map);
