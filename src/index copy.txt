@@ -1,0 +1,180 @@
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  /* Force light mode */
+  color-scheme: light !important;
+  color: #000000 !important;
+  background-color: #ffffff !important;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+a:hover {
+  color: #535bf2;
+}
+
+body {
+  margin: 0;
+  display: block;              /* ← stop centering the whole app */
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #f9f9f9;
+  color: #000000;
+  cursor: pointer;
+  transition: background-color 0.25s, border-color 0.25s;
+}
+
+button:hover {
+  background-color: #e9e9e9;
+  border-color: #999;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+/* ✅ Mobile & responsive tweaks */
+@media (max-width: 768px) {
+body {
+  padding: 12px;
+  display: block;
+}
+
+  table {
+    font-size: 12px !important;
+    width: 100% !important;
+    overflow-x: auto;
+    display: block;
+  }
+
+  input, select, button {
+    font-size: 14px !important;
+    width: 100%;
+  }
+
+  canvas {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  section {
+    width: 100%;
+  }
+}
+/* ---- Mobile layout polish ---- */
+@media (max-width: 768px) {
+  /* prevent iOS zoom on inputs */
+  input, select, button, textarea { font-size: 16px !important; }
+
+  /* cards & containers breathe */
+  .card, section { width: 100%; box-sizing: border-box; }
+
+  /* tables scroll horizontally instead of blowing the layout */
+  table { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  th, td { white-space: nowrap; }
+
+  /* buttons line up nicely */
+  .btn-row { display: flex; gap: 8px; width: 100%; }
+  .btn-row > * { flex: 1 1 auto; }
+
+  /* long labels wrap properly */
+  .wrap { white-space: normal !important; line-height: 1.25; }
+}
+
+/* allow light theme to stay readable everywhere */
+body { background: #fff !important; color: #000 !important; }
+/* ✅ Final visual fix for buttons & text */
+button {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border: 1px solid #ccc !important;
+}
+
+button:hover {
+  background-color: #f0f0f0 !important;
+  border-color: #999 !important;
+}
+
+/* Make form inputs and selects easier to read */
+input, select, textarea {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border: 1px solid #ccc !important;
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+/* Ensure page background stays white on mobile */
+html, body {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+/* Make everything fit nicely on iPhone screens */
+@media (max-width: 768px) {
+  body {
+    padding: 8px;
+    overflow-x: hidden;
+  }
+
+  section {
+    padding: 8px;
+  }
+
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+  }
+
+  th, td {
+    white-space: nowrap;
+  }
+}
+/* Make certain grid items span full width on phones */
+@media (max-width: 768px) {
+  .full-on-mobile { grid-column: 1 / -1 !important; }
+}
+/* prevent horizontal scrolling on mobile */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+/* better button layout on small screens */
+@media (max-width: 768px) {
+  .responsive-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .responsive-row > * {
+    flex: 1 1 auto;
+    min-width: 140px;
+  }
+}

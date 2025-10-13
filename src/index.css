@@ -1,11 +1,13 @@
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
   /* Force light mode */
   color-scheme: light !important;
-  color: #000000 !important;
+  color: #0f172a !important;
   background-color: #ffffff !important;
 
   font-synthesis: none;
@@ -14,167 +16,258 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+* {
+  box-sizing: border-box;
 }
-a:hover {
-  color: #535bf2;
+
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  max-width: 100vw;
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
 }
 
 body {
-  margin: 0;
-  display: block;              /* ← stop centering the whole app */
   min-width: 320px;
   min-height: 100vh;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+a {
+  font-weight: 500;
+  color: #2563eb;
+  text-decoration: inherit;
+}
+a:hover {
+  color: #1d4ed8;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  line-height: 1.2;
 }
 
 button {
   border-radius: 8px;
-  border: 1px solid #ccc;
+  border: 1px solid transparent;
   padding: 0.6em 1.2em;
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #f9f9f9;
-  color: #000000;
+  background-color: #f1f5f9;
+  color: #334155;
   cursor: pointer;
-  transition: background-color 0.25s, border-color 0.25s;
+  transition: all 0.2s ease;
 }
 
-button:hover {
-  background-color: #e9e9e9;
-  border-color: #999;
+button:hover:not(:disabled) {
+  background-color: #e2e8f0;
+  transform: translateY(-1px);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 button:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
-}
-/* ✅ Mobile & responsive tweaks */
-@media (max-width: 768px) {
-body {
-  padding: 12px;
-  display: block;
+  transform: none !important;
 }
 
-  table {
-    font-size: 12px !important;
-    width: 100% !important;
-    overflow-x: auto;
-    display: block;
-  }
-
-  input, select, button {
-    font-size: 14px !important;
-    width: 100%;
-  }
-
-  canvas {
-    max-width: 100% !important;
-    height: auto !important;
-  }
-
-  section {
-    width: 100%;
-  }
-}
-/* ---- Mobile layout polish ---- */
-@media (max-width: 768px) {
-  /* prevent iOS zoom on inputs */
-  input, select, button, textarea { font-size: 16px !important; }
-
-  /* cards & containers breathe */
-  .card, section { width: 100%; box-sizing: border-box; }
-
-  /* tables scroll horizontally instead of blowing the layout */
-  table { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  th, td { white-space: nowrap; }
-
-  /* buttons line up nicely */
-  .btn-row { display: flex; gap: 8px; width: 100%; }
-  .btn-row > * { flex: 1 1 auto; }
-
-  /* long labels wrap properly */
-  .wrap { white-space: normal !important; line-height: 1.25; }
-}
-
-/* allow light theme to stay readable everywhere */
-body { background: #fff !important; color: #000 !important; }
-/* ✅ Final visual fix for buttons & text */
-button {
-  background-color: #ffffff !important;
-  color: #000000 !important;
-  border: 1px solid #ccc !important;
-}
-
-button:hover {
-  background-color: #f0f0f0 !important;
-  border-color: #999 !important;
-}
-
-/* Make form inputs and selects easier to read */
 input, select, textarea {
-  background-color: #ffffff !important;
-  color: #000000 !important;
-  border: 1px solid #ccc !important;
-  border-radius: 6px;
-  padding: 6px 8px;
+  font-family: inherit;
+  font-size: 16px;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background-color: #f8fafc;
+  color: #0f172a;
+  transition: all 0.2s ease;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
 }
 
-/* Ensure page background stays white on mobile */
-html, body {
-  background-color: #ffffff !important;
-  color: #000000 !important;
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
-/* Make everything fit nicely on iPhone screens */
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+}
+
+input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #2563eb;
+}
+
+input[type="color"] {
+  padding: 2px;
+  cursor: pointer;
+  border: 1px solid #cbd5e1;
+}
+
+input[type="file"] {
+  cursor: pointer;
+}
+
+/* Table improvements */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  font-weight: 600;
+  text-align: left;
+}
+
+/* Details/Summary */
+details summary {
+  list-style: none;
+}
+
+details summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Responsive design for mobile */
 @media (max-width: 768px) {
+  /* Prevent zoom on input focus in iOS */
+  input, select, textarea, button {
+    font-size: 16px !important;
+  }
+
+  /* Better spacing on mobile */
   body {
-    padding: 8px;
-    overflow-x: hidden;
+    padding: 0 !important;
   }
 
-  section {
-    padding: 8px;
-  }
-
+  /* Ensure tables scroll horizontally */
   table {
     display: block;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+
+  thead, tbody, tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  /* Stack grid items on mobile */
+  .responsive-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Full width buttons on mobile */
+  button {
     width: 100%;
   }
 
-  th, td {
-    white-space: nowrap;
+  /* Better touch targets */
+  button, input, select {
+    min-height: 44px;
   }
 }
-/* Make certain grid items span full width on phones */
-@media (max-width: 768px) {
-  .full-on-mobile { grid-column: 1 / -1 !important; }
-}
-/* prevent horizontal scrolling on mobile */
-html, body {
-  overflow-x: hidden;
-  max-width: 100vw;
-}
-/* better button layout on small screens */
-@media (max-width: 768px) {
-  .responsive-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
 
-  .responsive-row > * {
-    flex: 1 1 auto;
-    min-width: 140px;
+/* Utility classes */
+.card {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Better focus visibility for accessibility */
+*:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+/* Loading states */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
   }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.loading {
+  animation: shimmer 2s infinite linear;
+  background: linear-gradient(to right, #f1f5f9 4%, #e2e8f0 25%, #f1f5f9 36%);
+  background-size: 1000px 100%;
+}
+
+/* Print styles */
+@media print {
+  body {
+    background: white !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* Prevent text selection on buttons */
+button {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Ensure proper contrast in dark mode (even though we're forcing light) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: light !important;
+  }
+  
+  body, html {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+  }
+}
+
+/* Better mobile tap highlighting */
+button, a, input, select {
+  -webkit-tap-highlight-color: rgba(37, 99, 235, 0.1);
+}
+
+/* Improved scrollbar styling for webkit browsers */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }

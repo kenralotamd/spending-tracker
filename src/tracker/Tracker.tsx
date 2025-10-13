@@ -29,10 +29,6 @@ function safeListCategories(hid?: string | null) {
   return listCategories(String(hid ?? ''));
 }
 
-/** ======= UI helpers ======= */
-const row = { display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', alignItems: 'end' } as const;
-const box = { border: '1px solid #eee', borderRadius: 8, padding: 12 } as const;
-
 const LS_NEG_SPEND = 'negatives_are_spend';
 
 function rulesKey(hid?: string | null) { return `spendr_learn_rules_${hid || 'none'}`; }
@@ -72,8 +68,8 @@ type ImportMapping = { date?: string; desc?: string; amount?: string; debit?: st
 
 /** Default fallback colors (used when a category has no color yet) */
 const DEFAULT_PALETTE = [
-  '#4e79a7','#f28e2b','#e15759','#76b7b2','#59a14f','#edc948',
-  '#b07aa1','#ff9da7','#9c755f','#bab0ab','#86a5d9','#f2c14e'
+  '#10b981','#3b82f6','#f59e0b','#8b5cf6','#ef4444','#06b6d4',
+  '#ec4899','#84cc16','#f97316','#6366f1','#14b8a6','#a855f7'
 ];
 
 function colorFor(_category: string, orderIndex: number, colorFromDb?: string | null) {
@@ -202,7 +198,7 @@ useEffect(() => {
     const map: Record<string, string> = {};
     const ordered = cats.length ? cats : [];
     ordered.forEach((c, idx) => { map[c.name] = colorFor(c.name, idx, c.color ?? undefined); });
-    map['Uncategorized'] = map['Uncategorized'] || '#999999';
+    map['Uncategorized'] = map['Uncategorized'] || '#6b7280';
     return map;
   }, [cats]);
 
@@ -286,9 +282,7 @@ useEffect(() => {
     try {
       if (!householdId) throw new Error('Household not ready yet.');
       if (!form.date || form.amount == null || isNaN(Number(form.amount))) throw new Error('Please enter a date and amount.');
-      // --- Step 6: Auto-categorize suggestion ---
       const suggested = suggestCategory(form.merchant || '', form.description || '', learnRules);
-      // Assign suggested category if present and no category selected
       const t: Txn = {
         household_id: householdId,
         date: form.date!,
@@ -303,8 +297,7 @@ useEffect(() => {
         external_id: null
       };
       if (suggested && !form.category) t.category = suggested;
-      // Debug log
-      console.log('Auto‑category suggestion used:', suggested);
+      console.log('Auto-category suggestion used:', suggested);
       const saved = await addTransaction(t);
       if (saved) setTxns(prev => [...prev, saved].sort((a,b)=>a.date.localeCompare(b.date)));
       setForm({
@@ -326,7 +319,6 @@ useEffect(() => {
     try {
       const saved = await updateTransaction(id, { category: cat });
       setTxns(prev => prev.map(x => x.id === id ? saved : x));
-      // Step 6: Persist learning rule for auto-categorization
       const key = normKey(saved.merchant || saved.description);
       const updatedRules = { ...learnRules, [key]: cat };
       setLearnRules(updatedRules);
@@ -386,7 +378,6 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
     const headers = res.meta.fields || Object.keys(rows[0]);
     openPreview(headers, rows);
   },
-  // ⬇️ change this bit
   error: (error: Error, _file: Papa.LocalFile | string) => {
     const msg = (error as any)?.message || String(error);
     alert('CSV parse error: ' + msg);
@@ -478,7 +469,6 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
     await renameCategoryAndMigrate(c.household_id, c.id, c.name, name);
     const safeHouseholdId: string = String(c.household_id ?? '');
     setCats(await safeListCategories(safeHouseholdId));
-    // refresh txns/budgets in view
     const refreshedTxns = await safeListTxns(safeHouseholdId, from, to);
     setTxns(refreshedTxns);
     const b = await safeListBudgets(safeHouseholdId);
@@ -562,7 +552,7 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
     const pdf = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
 
     const pageW = pdf.internal.pageSize.getWidth();
-    const contentW = pageW - 48; // 24pt margin each side
+    const contentW = pageW - 48;
     const scale = contentW / canvas.width;
     const imgW = contentW;
     const imgH = canvas.height * scale;
@@ -572,7 +562,7 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
     pdf.text('Spending Summary', 24, y);
     y += 12;
     pdf.setFontSize(10);
-    pdf.text(`Period: ${from || '…'} to ${to || '…'}`, 24, y);
+    pdf.text(`Period: ${from || '...'} to ${to || '...'}`, 24, y);
     y += 16;
 
     pdf.addImage(imgData, 'PNG', 24, y, imgW, imgH);
@@ -582,555 +572,139 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
 
   /** ---------- Render ---------- */
   return (
-    <div style={{ padding: 16, maxWidth: 960, margin: '0 auto', boxSizing: 'border-box' }}>
-      <div style={{ padding: 12, borderBottom: '1px solid #eee', display:'flex', justifyContent:'space-between' }}>
-        <div><strong>Spending Tracker</strong></div>
-        <div />
-      </div>
-
-      <h2 style={{ fontWeight: 700, fontSize: 22, textAlign:'center' }}>Spending Tracker — Cloud Sync</h2>
-      <div style={{ textAlign:'center', fontSize: 12, color: '#999', marginTop: 4 }}>Build: 2025-10-13c</div>
-
-      {bootLoading && <div style={{marginTop:8, padding:8, background:'#fffbe6', border:'1px solid #ffe58f', borderRadius:6}}>Setting up your household…</div>}
-      {householdError && <div style={{marginTop:8, padding:8, background:'#fff1f0', border:'1px solid #ffa39e', borderRadius:6}}>{householdError}</div>}
-     {householdId && (
-  <div
-    style={{
-      ...box,
-      marginTop: 8,
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 8
-    }}
-    className="card"
-  >
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-      <div style={{ minWidth: '120px' }}>Active household:</div>
-      <select
-        value={householdId}
-        onChange={e => onSelectHousehold(e.target.value)}
-        style={{ flex: '1 1 220px', minWidth: '180px' }}
-      >
-        {households.map(h => (
-          <option key={h.id} value={h.id}>
-            {h.name} ({h.id.slice(0, 8)})
-          </option>
-        ))}
-      </select>
-      <button onClick={onCreateHousehold}>Create new household</button>
-    </div>
-
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-      <label className="wrap" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <input
-          type="checkbox"
-          checked={negativesAreSpend}
-          onChange={e => {
-            setNegativesAreSpend(e.target.checked);
-            localStorage.setItem('negatives_are_spend', e.target.checked ? '1' : '0');
-          }}
-        />
-        Negatives are spending (ignore credits)
-      </label>
-    </div>
-  </div>
-)}
-
-      {/* Entry row */}
-      <section style={{ marginTop: 16, ...row }}>
-        <div style={{ gridColumn: 'span 2' }}>
-          <label>Date</label>
-          <input type="date" value={form.date || ''} onChange={e=>setForm(f=>({ ...f, date: e.target.value }))} />
-        </div>
-        <div style={{ gridColumn: 'span 2' }}>
-          <label>Person</label>
-          <select value={(form.person as any) || 'Both'} onChange={e=>setForm(f=>({ ...f, person: e.target.value as any }))}>
-            <option>Ken</option><option>Wife</option><option>Both</option>
-          </select>
-        </div>
-        <div style={{ gridColumn: 'span 3' }}>
-          <label>Merchant</label>
-          <input value={form.merchant || ''} onChange={e=>setForm(f=>({ ...f, merchant: e.target.value }))} placeholder="Chemist Warehouse" />
-        </div>
-        <div style={{ gridColumn: 'span 3' }}>
-          <label>Description</label>
-          <input value={form.description || ''} onChange={e=>setForm(f=>({ ...f, description: e.target.value }))} placeholder="Skin serum" />
-        </div>
-        <div style={{ gridColumn: '1 / -1' }}>
-  <label>Amount (AUD)</label>
-  <input
-    type="text"
-    name="amount"
-    autoComplete="off"
-    inputMode="decimal"
-    enterKeyHint="done"
-    pattern="[0-9]*[.,]?[0-9]*"
-    placeholder="0.00"
-    value={amountText}
-    onFocus={e => e.currentTarget.select()}
-    onChange={e => {
-      // Keep exactly what the user typed (incl. a trailing .) to avoid iOS issues
-      const raw = e.target.value.replace(/[^0-9.,]/g, '');
-      setAmountText(raw);
-    }}
-    onBlur={() => {
-      const normalized = amountText.replace(',', '.');
-      if (normalized === '' || normalized === '.' || normalized === ',') {
-        setForm(f => ({ ...f, amount: undefined }));
-        return;
-      }
-      const num = Number(normalized);
-      if (!isNaN(num)) setForm(f => ({ ...f, amount: num }));
-    }}
-    style={{ width: '100%', fontSize: '16px' }}
-  />
-</div>
-        <div style={{ gridColumn: 'span 3' }}>
-          <label>Category</label>
-          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <span style={{ width:12, height:12, borderRadius:999, background: catColorMap[form.category || 'Uncategorized'] }} />
-            <select value={form.category || 'Uncategorized'} onChange={e=>setForm(f=>({ ...f, category: e.target.value }))}>
-              {categoryNames.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-        </div>
-        {/* Add, Import, and Show only spending controls split into two blocks */}
-        <div style={{ gridColumn: 'span 5', display: 'flex', flexWrap:'wrap', alignItems: 'end', gap: 8 }} className="btn-row">
-          <button onClick={onAdd}>Add</button>
-          <input type="file" accept=".csv,.xlsx,.xls" onChange={e=>{ const f=e.target.files?.[0]; if (f) onImport(f); }} />
-        </div>
-        <div
-  style={{
-    gridColumn: '1 / -1',
-    display: 'flex',
-    flexWrap: 'wrap',
-    alignItems: 'flex-end',
-    gap: 12,
-    width: '100%',
-  }}
->
-  <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-    <input
-      type="checkbox"
-      checked={onlySpending}
-      onChange={e => setOnlySpending(e.target.checked)}
-    />
-    Show only spending
-  </label>
-
-  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-    <label style={{ minWidth: 36 }}>From</label>
-    <input type="date" value={from} onChange={e => setFrom(e.target.value)} />
-  </div>
-
-  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-    <label style={{ minWidth: 20 }}>To</label>
-    <input type="date" value={to} onChange={e => setTo(e.target.value)} />
-  </div>
-</div>
-      </section>
-
-      {/* Totals */}
-      <section style={{ marginTop: 20 }}>
-        <div style={{ fontSize: 18, fontWeight: 600 }}>Total spend: ${totals.totalOut.toFixed(2)}</div>
-      </section>
-
-      {/* Monthly Summary Dashboard */}
-      <section ref={summaryRef} style={{ marginTop: 20, ...box }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-            <button onClick={() => setDashTab('current')} disabled={dashTab === 'current'}>This Month</button>
-            <button onClick={() => setDashTab('archive')} disabled={dashTab === 'archive'}>Other Months</button>
-          </div>
-          {dashTab === 'current' && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-              <button
-                onClick={() => {
-                  const idx = monthsList.findIndex(m => m.month === selectedMonth);
-                  const next = monthsList[idx + 1];
-                  if (next) setSelectedMonth(next.month);
-                }}
-                disabled={monthsList.findIndex(m => m.month === selectedMonth) === monthsList.length - 1 || monthsList.length === 0}
-                title="Previous"
-              >◀</button>
-              <div style={{ fontWeight: 600 }}>{formatMonth(selectedMonth) || 'This Month'}</div>
-              <button
-                onClick={() => {
-                  const idx = monthsList.findIndex(m => m.month === selectedMonth);
-                  const prev = monthsList[idx - 1];
-                  if (prev) setSelectedMonth(prev.month);
-                }}
-                disabled={monthsList.findIndex(m => m.month === selectedMonth) <= 0}
-                title="Next"
-              >▶</button>
-              <button onClick={exportSummaryPDF} style={{ marginLeft: 8 }}>Export PDF</button>
-              <button
-                onClick={async () => {
-                  if (!householdId) return alert('No household selected.');
-                  const confirmMsg = dashTab === 'current'
-                    ? `Are you sure you want to delete all transactions for ${formatMonth(selectedMonth)}?`
-                    : 'Are you sure you want to delete all transactions currently in view?';
-                  if (!window.confirm(confirmMsg)) return;
-                  try {
-                    const toDelete = txns.filter(t => yyyymm(t.date) === selectedMonth);
-                    for (const t of toDelete) {
-                      await deleteTransaction(t.id!);
-                    }
-                    setTxns(prev => prev.filter(t => yyyymm(t.date) !== selectedMonth));
-                    alert(`Deleted ${toDelete.length} transactions for ${formatMonth(selectedMonth)}.`);
-                  } catch (err) {
-                    console.error(err);
-                    alert('Failed to delete some transactions.');
-                  }
-                }}
-                style={{ marginLeft: 8, background: '#f44336', color: '#fff' }}
-              >
-                Clear All Transactions
-              </button>
-            </div>
-          )}
-        </div>
-
-        {dashTab === 'current' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 12 }}>
-            <div style={{ minHeight: 280 }}>
-              <canvas ref={pieRef} />
-            </div>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #f8fafc, #eff6ff)' }}>
+      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 16px' }}>
+        {/* Header */}
+        <div style={{ 
+          background: '#fff', 
+          borderRadius: 16, 
+          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)', 
+          padding: 24, 
+          marginBottom: 24,
+          border: '1px solid #e2e8f0'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
             <div>
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>Total spend: ${currentMonthData.totalOut.toFixed(2)}</div>
-              <table style={{ width: '100%', fontSize: 14, borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: 'left', borderBottom: '1px solid #eee', padding: '6px' }}>Category</th>
-                    <th style={{ textAlign: 'right', borderBottom: '1px solid #eee', padding: '6px' }}>Spend (AUD)</th>
-                    <th style={{ textAlign: 'right', borderBottom: '1px solid #eee', padding: '6px' }}>%</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {currentMonthData.catRows.map((r) => (
-                    <tr key={r.category}>
-                      <td style={{ padding: '6px' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ width: 10, height: 10, borderRadius: 999, background: catColorMap[r.category] }} />
-                          {r.category}
-                        </span>
-                      </td>
-                      <td style={{ padding: '6px', textAlign: 'right' }}>${r.spend.toFixed(2)}</td>
-                      <td style={{ padding: '6px', textAlign: 'right' }}>{r.pct.toFixed(1)}%</td>
-                    </tr>
-                  ))}
-                  {!currentMonthData.catRows.length && (
-                    <tr><td colSpan={3} style={{ padding: '8px', color: '#888' }}>No data yet</td></tr>
-                  )}
-                </tbody>
-              </table>
+              <h1 style={{ 
+                fontSize: 30, 
+                fontWeight: 700, 
+                background: 'linear-gradient(to right, #2563eb, #4f46e5)', 
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                margin: 0
+              }}>
+                Spending Tracker
+              </h1>
+              <p style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>Cloud Sync Enabled • Build: 2025-10-13g</p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: '#d1fae5', color: '#065f46', borderRadius: 9999, border: '1px solid #86efac', fontSize: 14, fontWeight: 500 }}>
+              <span>✓</span>
+              <span>Synced</span>
             </div>
           </div>
-        ) : (
-          <div style={{ marginTop: 12 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
-              {monthsList.map(m => (
-                <button
-                  key={m.month}
-                  onClick={() => { setSelectedMonth(m.month); setDashTab('current'); }}
-                  style={{ textAlign: 'left', padding: 12, border: '1px solid #ddd', borderRadius: 8, background: '#fff' }}
+        </div>
+
+        {bootLoading && <div style={{marginTop:8, padding:16, background:'#fef3c7', border:'1px solid #fde047', borderRadius:12, color:'#92400e'}}>Setting up your household...</div>}
+        {householdError && <div style={{marginTop:8, padding:16, background:'#fee2e2', border:'1px solid #fca5a5', borderRadius:12, color:'#991b1b'}}>{householdError}</div>}
+        
+        {/* Household Selector */}
+        {householdId && (
+          <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1)', padding: 24, marginBottom: 24, border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'end' }}>
+                <div style={{ flex: '1 1 300px', minWidth: 200 }}>
+                  <label style={{ display: 'block', fontSize: 14, fontWeight: 600, color: '#334155', marginBottom: 8 }}>Active Household</label>
+                  <select
+                    value={householdId}
+                    onChange={e => onSelectHousehold(e.target.value)}
+                    style={{ width: '100%', padding: '10px 16px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, fontSize: 14 }}
+                  >
+                    {households.map(h => (
+                      <option key={h.id} value={h.id}>
+                        {h.name} ({h.id.slice(0, 8)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button 
+                  onClick={onCreateHousehold}
+                  style={{ padding: '10px 24px', background: 'linear-gradient(to right, #2563eb, #4f46e5)', color: '#fff', fontWeight: 600, border: 'none', borderRadius: 8, cursor: 'pointer', boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1)', transition: 'all 0.2s' }}
+                  onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                  onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
                 >
-                  <div style={{ fontWeight: 600 }}>{formatMonth(m.month)}</div>
-                  <div style={{ color: '#666' }}>Total: ${m.total.toFixed(2)}</div>
+                  Create New Household
                 </button>
-              ))}
-              {!monthsList.length && (
-                <div style={{ color: '#888' }}>No months to show yet.</div>
-              )}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="checkbox"
+                  id="neg-spend"
+                  checked={negativesAreSpend}
+                  onChange={e => {
+                    setNegativesAreSpend(e.target.checked);
+                    localStorage.setItem('negatives_are_spend', e.target.checked ? '1' : '0');
+                  }}
+                  style={{ width: 16, height: 16 }}
+                />
+                <label htmlFor="neg-spend" style={{ fontSize: 14, color: '#334155' }}>Negatives are spending (ignore credits)</label>
+              </div>
             </div>
           </div>
         )}
-      </section>
 
-      {/* Transactions table */}
-      <section style={{ marginTop: 20 }}>
-        <h3>Transactions</h3>
-        <div style={{ maxHeight: '60vh', overflowX: 'auto', overflowY: 'auto', border: '1px solid #eee', borderRadius: 8, width:'100%' }} className="card">
-          <table style={{ width: '100%', fontSize: 14 }}>
-            <thead style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 2 }}>
-              <tr style={{ textAlign: 'left', borderBottom: '1px solid #eee' }}>
-                <th
-                  style={{ padding: '8px 6px', cursor: 'pointer', background: '#fff' }}
-                  onClick={() => {
-                    setSortDir(prev => (sortBy === 'date' ? (prev === 'asc' ? 'desc' : 'asc') : 'asc'));
-                    setSortBy('date');
-                  }}
-                >
-                  Date {sortBy === 'date' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th
-                  style={{ padding: '8px 6px', cursor: 'pointer', background: '#fff' }}
-                  onClick={() => {
-                    setSortDir(prev => (sortBy === 'merchant' ? (prev === 'asc' ? 'desc' : 'asc') : 'asc'));
-                    setSortBy('merchant');
-                  }}
-                >
-                  Merchant {sortBy === 'merchant' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th style={{ padding: '8px 6px', background: '#fff' }}>
-                  Description (editable)
-                </th>
-                <th
-                  style={{ padding: '8px 6px', textAlign: 'right', cursor: 'pointer', background: '#fff' }}
-                  onClick={() => {
-                    setSortDir(prev => (sortBy === 'amount' ? (prev === 'asc' ? 'desc' : 'asc') : 'asc'));
-                    setSortBy('amount');
-                  }}
-                >
-                  Amount {sortBy === 'amount' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th
-                  style={{ padding: '8px 6px', cursor: 'pointer', background: '#fff' }}
-                  onClick={() => {
-                    setSortDir(prev => (sortBy === 'category' ? (prev === 'asc' ? 'desc' : 'asc') : 'asc'));
-                    setSortBy('category');
-                  }}
-                >
-                  Category {sortBy === 'category' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th style={{ padding: '8px 6px', background: '#fff' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(t => (
-                <tr key={t.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={{ padding: '8px 6px', whiteSpace:'nowrap' }}>{t.date}</td>
-                  <td style={{ padding: '8px 6px' }}>{t.merchant}</td>
-                  <td style={{ padding: '8px 6px' }}>
-                    <input
-                      style={{ width:'100%' }}
-                      defaultValue={t.description || ''}
-                      onBlur={e => {
-                        const v = e.currentTarget.value;
-                        if (v !== (t.description || '')) onChangeDescription(t.id!, v);
-                      }}
-                    />
-                  </td>
-                  <td style={{ padding: '8px 6px', textAlign:'right' }}>${t.amount.toFixed(2)}</td>
-                  <td style={{ padding: '8px 6px' }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                      <span style={{ width:10, height:10, borderRadius:999, background: catColorMap[t.category || 'Uncategorized'] }} />
-                      <select value={t.category || 'Uncategorized'} onChange={e=>onChangeCategory(t.id!, e.target.value)}>
-                        {categoryNames.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-                  </td>
-                  <td style={{ padding: '8px 6px' }}>
-                    <button onClick={()=>onDelete(t.id!)}>Delete</button>
-                  </td>
-                </tr>
-              ))}
-              {!filtered.length && (
-                <tr>
-                  <td colSpan={6} style={{ padding:12, textAlign:'center', color:'#999' }}>
-                    No transactions yet
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* Categories manager */}
-      <section style={{ marginTop: 24 }}>
-        <details
-          open={catsOpen}
-          onToggle={(e) => setCatsOpen((e.target as HTMLDetailsElement).open)}
-          style={{ marginTop: 8, border: '1px solid #ddd', borderRadius: 8, padding: 8, background: '#fafafa' }}
-          className="card"
-        >
-          <summary
-            style={{
-              cursor: 'pointer',
-              fontWeight: 600,
-              padding: '8px 0',
-              userSelect: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6
-            }}
-          >
-            <span>{catsOpen ? '▾' : '▸'}</span>
-            <span>Categories</span>
-          </summary>
-          <div style={{ ...box, marginTop: 8 }}>
-            {!cats.length && (
-              <div style={{ marginBottom: 8 }}>
-                <button
-                  onClick={async () => {
-                    if (!householdId) return;
-                    await seedDefaultCategories(String(householdId));
-                    setCats(await safeListCategories(householdId));
-                  }}
-                >
-                  Seed default categories
-                </button>
-              </div>
-            )}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr auto auto auto',
-                gap: 8,
-                alignItems: 'center'
-              }}
-            >
-              {cats.map((c, idx) => (
-                <div key={c.id} style={{ display: 'contents' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span
-                      style={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: 999,
-                        background: colorFor(c.name, idx, c.color ?? undefined)
-                      }}
-                    />
-                    {c.name}
-                  </div>
-                  <input
-                    type="color"
-                    value={(c.color as string) || colorFor(c.name, idx, c.color ?? undefined)}
-                    onChange={e => onSetColor(c, e.target.value)}
-                    title="Pick color"
-                    style={{
-                      width: 36,
-                      height: 28,
-                      padding: 0,
-                      border: '1px solid #ddd',
-                      borderRadius: 6,
-                      background: '#fff'
-                    }}
-                  />
-                  <button onClick={() => onRenameCategory(c)}>Rename</button>
-                  <button onClick={() => onDeleteCategory(c)}>Delete</button>
-                </div>
-              ))}
-              <div style={{ display: 'contents', marginTop: 6 }}>
-                <input
-                  placeholder="New category name"
-                  value={newCat}
-                  onChange={e => setNewCat(e.target.value)}
-                />
-                <div />
-                <button onClick={onAddCategory}>Add</button>
-                <div />
-              </div>
+        {/* Add Transaction Form */}
+        <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1)', padding: 24, marginBottom: 24, border: '1px solid #e2e8f0' }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', marginBottom: 16 }}>Add Transaction</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 14, fontWeight: 600, color: '#334155', marginBottom: 8 }}>Date</label>
+              <input type="date" value={form.date || ''} onChange={e=>setForm(f=>({ ...f, date: e.target.value }))} style={{ width: '100%', padding: '10px 16px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, fontSize: 16 }} />
             </div>
-            <div style={{ marginTop: 8, fontSize: 12, color: '#777' }}>
-              • You can’t delete a category that’s used by any transactions or budgets.
-              • Renaming will migrate existing transactions and the matching budget row.
+            <div>
+              <label style={{ display: 'block', fontSize: 14, fontWeight: 600, color: '#334155', marginBottom: 8 }}>Person</label>
+              <select value={(form.person as any) || 'Both'} onChange={e=>setForm(f=>({ ...f, person: e.target.value as any }))} style={{ width: '100%', padding: '10px 16px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, fontSize: 16 }}>
+                <option>Ken</option><option>Wife</option><option>Both</option>
+              </select>
             </div>
-          </div>
-        </details>
-      </section>
-
-      {/* Import preview modal */}
-      {showPreview && (
-        <div style={{
-          position:'fixed', inset:0, background:'rgba(0,0,0,0.35)',
-          display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000
-        }}>
-          <div style={{ background:'#fff', borderRadius:10, width:'min(980px, 96vw)', maxHeight:'90vh', overflow:'auto', padding:16 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <h3 style={{ margin:0 }}>Preview & Map Columns</h3>
-              <button onClick={()=>setShowPreview(false)} disabled={importBusy}>Close</button>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontSize: 14, fontWeight: 600, color: '#334155', marginBottom: 8 }}>Merchant</label>
+              <input value={form.merchant || ''} onChange={e=>setForm(f=>({ ...f, merchant: e.target.value }))} placeholder="Chemist Warehouse" style={{ width: '100%', padding: '10px 16px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, fontSize: 16 }} />
             </div>
-            <p style={{ marginTop:8 }}>Map your CSV/XLSX columns, then Import. Negatives treated as spending when that setting is enabled.</p>
-
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:10, marginTop:8 }}>
-              <div>
-                <div style={{ fontWeight:600 }}>Date</div>
-                <select value={mapping.date || ''} onChange={e=>setMapping(m=>({ ...m, date: e.target.value || undefined }))}>
-                  <option value="">-- choose --</option>
-                  {previewHeaders.map(h => <option key={h} value={h}>{h}</option>)}
-                </select>
-              </div>
-              <div>
-                <div style={{ fontWeight:600 }}>Description</div>
-                <select value={mapping.desc || ''} onChange={e=>setMapping(m=>({ ...m, desc: e.target.value || undefined }))}>
-                  <option value="">-- choose --</option>
-                  {previewHeaders.map(h => <option key={h} value={h}>{h}</option>)}
-                </select>
-              </div>
-              <div>
-                <div style={{ fontWeight:600 }}>Amount (single)</div>
-                <select value={mapping.amount || ''} onChange={e=>setMapping(m=>({ ...m, amount: e.target.value || undefined, debit: undefined, credit: undefined }))}>
-                  <option value="">-- none / use Debit+Credit --</option>
-                  {previewHeaders.map(h => <option key={h} value={h}>{h}</option>)}
-                </select>
-              </div>
-              <div />
-              <div>
-                <div style={{ fontWeight:600 }}>Debit (if separate)</div>
-                <select value={mapping.debit || ''} onChange={e=>setMapping(m=>({ ...m, debit: e.target.value || undefined, amount: undefined }))}>
-                  <option value="">-- none --</option>
-                  {previewHeaders.map(h => <option key={h} value={h}>{h}</option>)}
-                </select>
-              </div>
-              <div>
-                <div style={{ fontWeight:600 }}>Credit (if separate)</div>
-                <select value={mapping.credit || ''} onChange={e=>setMapping(m=>({ ...m, credit: e.target.value || undefined, amount: undefined }))}>
-                  <option value="">-- none --</option>
-                  {previewHeaders.map(h => <option key={h} value={h}>{h}</option>)}
-                </select>
-              </div>
-              <div style={{ gridColumn:'span 2', display:'flex', alignItems:'center', gap:8 }}>
-                <label style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <input
-                    type="checkbox"
-                    checked={negativesAreSpend}
-                    onChange={e=>setNegativesAreSpend(e.target.checked)}
-                  />
-                  Negatives are spending (ignore credits)
-                </label>
-              </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontSize: 14, fontWeight: 600, color: '#334155', marginBottom: 8 }}>Description</label>
+              <input value={form.description || ''} onChange={e=>setForm(f=>({ ...f, description: e.target.value }))} placeholder="Skin serum" style={{ width: '100%', padding: '10px 16px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, fontSize: 16 }} />
             </div>
-
-            <div style={{ ...box, marginTop:12 }}>
-              <div style={{ fontWeight:600, marginBottom:8 }}>First 10 rows</div>
-              <div style={{ overflow:'auto', maxHeight: 320 }}>
-                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
-                  <thead>
-                    <tr>
-                      {previewHeaders.map(h => (
-                        <th key={h} style={{ borderBottom:'1px solid #eee', textAlign:'left', padding:6 }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {previewRows.slice(0,10).map((r, i) => (
-                      <tr key={i}>
-                        {previewHeaders.map(h => (
-                          <td key={h} style={{ borderBottom:'1px solid #f7f7f7', padding:6 }}>
-                            {String(r[h] ?? '')}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 14, fontWeight: 600, color: '#334155', marginBottom: 8 }}>Amount (AUD)</label>
+              <input
+                type="text"
+                name="amount"
+                autoComplete="off"
+                inputMode="decimal"
+                enterKeyHint="done"
+                pattern="[0-9]*[.,]?[0-9]*"
+                placeholder="0.00"
+                value={amountText}
+                onFocus={e => e.currentTarget.select()}
+                onChange={e => {
+                  const raw = e.target.value.replace(/[^0-9.,]/g, '');
+                  setAmountText(raw);
+                }}
+                onBlur={() => {
+                  const normalized = amountText.replace(',', '.');
+                  if (normalized === '' || normalized === '.' || normalized === ',') {
+                    setForm(f => ({ ...f, amount: undefined }));
+                    return;
+                  }
+                  const num = Number(normalized);
+                  if (!isNaN(num)) setForm(f => ({ ...f, amount: num }));
+                }}
+                style={{ width: '100%', padding: '10px 16px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, fontSize: 16 }}
+              />
             </div>
-
-            <div style={{ marginTop:12, display:'flex', justifyContent:'flex-end', gap:8 }}>
-              <button onClick={()=>setShowPreview(false)} disabled={importBusy}>Cancel</button>
-              <button onClick={commitImport} disabled={importBusy} style={{ padding:'8px 14px' }}>
-                {importBusy ? 'Importing…' : 'Import'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      <footer style={{ textAlign: 'center', color: '#aaa', marginTop: 40, fontSize: 12 }}>
-        Spending Tracker © 2025 — Build: 2025-10-13g
-      </footer>
-    </div>
-  );
-}
+            <div>
+              <label style={{ display: 'block', fontSize: 14, fontWeight: 600, color: '#334155', marginBottom: 8 }}>Category</label>
+              <div style={{ display:'flex', alignItems:'center', gap:8, padding: '10px 16px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8 }}>
+                <span style={{ width:12, height:12, borderRadius:999, background: catColorMap[form.category || 'Uncategorized'], flexShrink: 0 }} />
+                <select value={form.category || 'Uncategorized'} onChange={e=>setForm(f=>({ ...f, category: e.target.value }))} style={{ flex: 1, background: 'transparent', border: 'none', fontSize:
