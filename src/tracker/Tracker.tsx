@@ -465,21 +465,22 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
     if (!name || name === c.name) return;
     await renameCategoryAndMigrate(c.household_id, c.id, c.name, name);
     setCats(await listCategories(c.household_id));
-// refresh txns/budgets in view
-const safeHouseholdId: string = c.household_id ?? '';
-const safeFrom: string = from ?? '';
-const safeTo: string = to ?? '';
+    // refresh txns/budgets in view
+    const safeHouseholdId: string = String(c.household_id || '');
+    const safeFrom: string = String(from || '');
+    const safeTo: string = String(to || '');
 
-setTxns(await listTransactions(
-  safeHouseholdId as string,
-  safeFrom as string,
-  safeTo as string
-));
+    const refreshedTxns = await listTransactions(
+      safeHouseholdId,
+      safeFrom,
+      safeTo
+    );
+    setTxns(refreshedTxns);
 
-const b = await listBudgets(safeHouseholdId);
-const map: Record<string, number> = {};
-b.forEach(x => map[x.category] = Number(x.amount));
-setBudgets(map);
+    const b = await listBudgets(safeHouseholdId);
+    const map: Record<string, number> = {};
+    b.forEach(x => map[x.category] = Number(x.amount));
+    setBudgets(map);
   }
 
   async function onDeleteCategory(c: Category) {
