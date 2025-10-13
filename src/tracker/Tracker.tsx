@@ -18,6 +18,17 @@ import {
   renameCategoryAndMigrate, seedDefaultCategories, updateCategoryColor, type Category
 } from '../categories';
 
+// ---- TS-safe wrappers to ensure string args ----
+function safeListTxns(hid?: string | null, from?: string | null, to?: string | null) {
+  return listTransactions(String(hid ?? ''), String(from ?? ''), String(to ?? ''));
+}
+function safeListBudgets(hid?: string | null) {
+  return listBudgets(String(hid ?? ''));
+}
+function safeListCategories(hid?: string | null) {
+  return listCategories(String(hid ?? ''));
+}
+
 /** ======= UI helpers ======= */
 const row = { display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', alignItems: 'end' } as const;
 const box = { border: '1px solid #eee', borderRadius: 8, padding: 12 } as const;
@@ -160,13 +171,10 @@ const list = await listMyHouseholds();
     if (!householdId) return;
     (async () => {
       try {
-        const safeHouseholdId: string = householdId ? String(householdId) : '';
-        const safeFrom: string = from ? String(from) : '';
-        const safeTo: string = to ? String(to) : '';
         const [rows, b, c] = await Promise.all([
-          listTransactions(safeHouseholdId, safeFrom, safeTo),
-          listBudgets(safeHouseholdId),
-          listCategories(safeHouseholdId),
+          safeListTxns(householdId, from, to),
+          safeListBudgets(householdId),
+          safeListCategories(householdId),
         ]);
         setTxns(rows);
         const map: Record<string, number> = {};
@@ -460,7 +468,7 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
     const safeHouseholdId: string = householdId ? String(householdId) : '';
     const created = await createCategory(safeHouseholdId, newCat.trim());
     if (created === null) { alert('Category already exists.'); return; }
-    setCats(await listCategories(safeHouseholdId));
+    setCats(await safeListCategories(safeHouseholdId));
     setNewCat('');
   }
 
@@ -468,20 +476,12 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
     const name = prompt('Rename category', c.name)?.trim();
     if (!name || name === c.name) return;
     await renameCategoryAndMigrate(c.household_id, c.id, c.name, name);
-    const safeHouseholdId: string = c.household_id ? String(c.household_id) : '';
-    setCats(await listCategories(safeHouseholdId));
+    const safeHouseholdId: string = String(c.household_id ?? '');
+    setCats(await safeListCategories(safeHouseholdId));
     // refresh txns/budgets in view
-    const safeFrom: string = from ? String(from) : '';
-    const safeTo: string = to ? String(to) : '';
-
-    const refreshedTxns = await listTransactions(
-      safeHouseholdId,
-      safeFrom,
-      safeTo
-    );
+    const refreshedTxns = await safeListTxns(safeHouseholdId, from, to);
     setTxns(refreshedTxns);
-
-    const b = await listBudgets(safeHouseholdId || '');
+    const b = await safeListBudgets(safeHouseholdId);
     const map: Record<string, number> = {};
     b.forEach(x => map[x.category] = Number(x.amount));
     setBudgets(map);
@@ -491,7 +491,7 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
     try {
       const safeHouseholdId: string = c.household_id ? String(c.household_id) : '';
       await deleteCategoryIfUnused(safeHouseholdId, c.id, c.name);
-      setCats(await listCategories(safeHouseholdId));
+      setCats(await safeListCategories(safeHouseholdId));
     } catch (e: any) {
       alert(e?.message || 'Cannot delete category');
     }
@@ -500,7 +500,7 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
   async function onSetColor(c: Category, hex: string) {
     await updateCategoryColor(c.id, hex || null);
     const safeHouseholdId: string = c.household_id ? String(c.household_id) : '';
-    setCats(await listCategories(safeHouseholdId));
+    setCats(await safeListCategories(safeHouseholdId));
   }
 
   /** ---------- Chart & PDF ---------- */
