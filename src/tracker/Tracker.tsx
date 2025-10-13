@@ -161,7 +161,7 @@ const list = await listMyHouseholds();
     (async () => {
       try {
         const [rows, b, c] = await Promise.all([
-          listTransactions(householdId, from ?? '', to ?? ''),
+          listTransactions(String(householdId || ''), String(from || ''), String(to || '')),
           listBudgets(householdId),
           listCategories(householdId),
         ]);
