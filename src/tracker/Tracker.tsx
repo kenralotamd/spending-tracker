@@ -160,10 +160,13 @@ const list = await listMyHouseholds();
     if (!householdId) return;
     (async () => {
       try {
+        const safeHouseholdId: string = householdId ? String(householdId) : '';
+        const safeFrom: string = from ? String(from) : '';
+        const safeTo: string = to ? String(to) : '';
         const [rows, b, c] = await Promise.all([
-          listTransactions(String(householdId || ''), String(from || ''), String(to || '')),
-          listBudgets(householdId),
-          listCategories(householdId),
+          listTransactions(safeHouseholdId, safeFrom, safeTo),
+          listBudgets(safeHouseholdId),
+          listCategories(safeHouseholdId),
         ]);
         setTxns(rows);
         const map: Record<string, number> = {};
@@ -454,9 +457,10 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
   /** ---------- Category actions ---------- */
   async function onAddCategory() {
     if (!householdId || !newCat.trim()) return;
-    const created = await createCategory(householdId, newCat.trim());
+    const safeHouseholdId: string = householdId ? String(householdId) : '';
+    const created = await createCategory(safeHouseholdId, newCat.trim());
     if (created === null) { alert('Category already exists.'); return; }
-    setCats(await listCategories(householdId));
+    setCats(await listCategories(safeHouseholdId));
     setNewCat('');
   }
 
@@ -464,11 +468,11 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
     const name = prompt('Rename category', c.name)?.trim();
     if (!name || name === c.name) return;
     await renameCategoryAndMigrate(c.household_id, c.id, c.name, name);
-    setCats(await listCategories(c.household_id));
+    const safeHouseholdId: string = c.household_id ? String(c.household_id) : '';
+    setCats(await listCategories(safeHouseholdId));
     // refresh txns/budgets in view
-    const safeHouseholdId: string = String(c.household_id || '');
-    const safeFrom: string = String(from || '');
-    const safeTo: string = String(to || '');
+    const safeFrom: string = from ? String(from) : '';
+    const safeTo: string = to ? String(to) : '';
 
     const refreshedTxns = await listTransactions(
       safeHouseholdId,
@@ -477,7 +481,7 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
     );
     setTxns(refreshedTxns);
 
-    const b = await listBudgets(safeHouseholdId);
+    const b = await listBudgets(safeHouseholdId || '');
     const map: Record<string, number> = {};
     b.forEach(x => map[x.category] = Number(x.amount));
     setBudgets(map);
@@ -485,8 +489,9 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
 
   async function onDeleteCategory(c: Category) {
     try {
-      await deleteCategoryIfUnused(c.household_id, c.id, c.name);
-      setCats(await listCategories(c.household_id));
+      const safeHouseholdId: string = c.household_id ? String(c.household_id) : '';
+      await deleteCategoryIfUnused(safeHouseholdId, c.id, c.name);
+      setCats(await listCategories(safeHouseholdId));
     } catch (e: any) {
       alert(e?.message || 'Cannot delete category');
     }
@@ -494,7 +499,8 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
 
   async function onSetColor(c: Category, hex: string) {
     await updateCategoryColor(c.id, hex || null);
-    setCats(await listCategories(c.household_id));
+    const safeHouseholdId: string = c.household_id ? String(c.household_id) : '';
+    setCats(await listCategories(safeHouseholdId));
   }
 
   /** ---------- Chart & PDF ---------- */
