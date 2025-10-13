@@ -24,6 +24,25 @@ const box = { border: '1px solid #eee', borderRadius: 8, padding: 12 } as const;
 
 const LS_NEG_SPEND = 'negatives_are_spend';
 
+function rulesKey(hid?: string | null) { return `spendr_learn_rules_${hid || 'none'}`; }
+function loadLearnRules(hid?: string | null): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(rulesKey(hid));
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+function saveLearnRules(hid: string | null, rules: Record<string, string>) {
+  try { localStorage.setItem(rulesKey(hid), JSON.stringify(rules)); } catch {}
+}
+function normKey(s: string) {
+  return (s || '').toUpperCase().replace(/\s+/g, ' ').trim();
+}
+function suggestCategory(merchant: string, description: string, rules: Record<string, string>) {
+  const keys = [merchant, description].map(normKey).filter(Boolean);
+  for (const k of keys) { if (rules[k]) return rules[k]; }
+  return null;
+}
+
 /** Normalize header names for matching */
 function norm(s: string) {
   return (s || '').toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
@@ -63,6 +82,16 @@ export default function Tracker() {
   /** ---------- Categories ---------- */
   const [cats, setCats] = useState<Category[]>([]);
   const [newCat, setNewCat] = useState('');
+
+// sorting
+const [sortBy, setSortBy] = useState<'date' | 'merchant' | 'amount' | 'category'>('date');
+const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+// amount input as text to preserve decimal typing on iOS
+const [amountText, setAmountText] = useState<string>('');
+
+// simple learn-to-categorize (per household) stored in localStorage
+const [learnRules, setLearnRules] = useState<Record<string, string>>({});
 
   /** ---------- Data ---------- */
   const [txns, setTxns] = useState<Txn[]>([]);
@@ -107,9 +136,10 @@ export default function Tracker() {
     (async () => {
       try {
         setBootLoading(true);
-        const hid = await ensureHousehold();
-        setHouseholdId(hid);
-        const list = await listMyHouseholds();
+const hid = await ensureHousehold();
+setHouseholdId(hid);
+setLearnRules(loadLearnRules(hid));
+const list = await listMyHouseholds();
         setHouseholds(list);
 
         const today = new Date();
@@ -146,6 +176,11 @@ export default function Tracker() {
     })();
   }, [householdId, from, to]);
 
+/** ---------- Reload learned rules when household changes ---------- */
+useEffect(() => {
+  setLearnRules(loadLearnRules(householdId));
+}, [householdId]);
+
   /** Persist preference */
   useEffect(() => { try { localStorage.setItem(LS_NEG_SPEND, negativesAreSpend ? '1' : '0'); } catch {} }, [negativesAreSpend]);
 
@@ -161,10 +196,23 @@ export default function Tracker() {
   }, [cats]);
 
   const filtered = useMemo(() => {
-    return txns
-      .filter(t => (onlySpending ? t.amount > 0 : true))
-      .sort((a,b) => a.date.localeCompare(b.date));
-  }, [txns, onlySpending]);
+  const rows = txns.filter(t => (onlySpending ? t.amount > 0 : true));
+  const dir = sortDir === 'asc' ? 1 : -1;
+  rows.sort((a, b) => {
+    switch (sortBy) {
+      case 'merchant':
+        return a.merchant.localeCompare(b.merchant) * dir;
+      case 'category':
+        return (a.category || '').localeCompare(b.category || '') * dir;
+      case 'amount':
+        return (a.amount - b.amount) * dir;
+      case 'date':
+      default:
+        return a.date.localeCompare(b.date) * dir;
+    }
+  });
+  return rows;
+}, [txns, onlySpending, sortBy, sortDir]);
 
   const totals = useMemo(() => {
     const totalOut = filtered.reduce((s,t) => s + Math.max(0, t.amount), 0);
@@ -227,6 +275,9 @@ export default function Tracker() {
     try {
       if (!householdId) throw new Error('Household not ready yet.');
       if (!form.date || form.amount == null || isNaN(Number(form.amount))) throw new Error('Please enter a date and amount.');
+      // --- Step 6: Auto-categorize suggestion ---
+      const suggested = suggestCategory(form.merchant || '', form.description || '', learnRules);
+      // Assign suggested category if present and no category selected
       const t: Txn = {
         household_id: householdId,
         date: form.date!,
@@ -240,6 +291,9 @@ export default function Tracker() {
         source: 'manual',
         external_id: null
       };
+      if (suggested && !form.category) t.category = suggested;
+      // Debug log
+      console.log('Auto‑category suggestion used:', suggested);
       const saved = await addTransaction(t);
       if (saved) setTxns(prev => [...prev, saved].sort((a,b)=>a.date.localeCompare(b.date)));
       setForm({
@@ -249,6 +303,7 @@ export default function Tracker() {
         category: form.category || 'Uncategorized',
         source: 'manual'
       });
+      setAmountText('');
     } catch (e: any) {
       alert(e?.message || 'Failed to add transaction');
       console.error(e);
@@ -260,6 +315,11 @@ export default function Tracker() {
     try {
       const saved = await updateTransaction(id, { category: cat });
       setTxns(prev => prev.map(x => x.id === id ? saved : x));
+      // Step 6: Persist learning rule for auto-categorization
+      const key = normKey(saved.merchant || saved.description);
+      const updatedRules = { ...learnRules, [key]: cat };
+      setLearnRules(updatedRules);
+      saveLearnRules(householdId, updatedRules);
     } catch (e: any) {
       alert(e?.message || 'Failed to update category');
       console.error(e);
@@ -516,57 +576,48 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
 
       {bootLoading && <div style={{marginTop:8, padding:8, background:'#fffbe6', border:'1px solid #ffe58f', borderRadius:6}}>Setting up your household…</div>}
       {householdError && <div style={{marginTop:8, padding:8, background:'#fff1f0', border:'1px solid #ffa39e', borderRadius:6}}>{householdError}</div>}
-      {householdId && (
+     {householdId && (
   <div
-  style={{
-    ...box,
-    marginTop: 8,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-    flexWrap: 'wrap', // ✅ allows wrapping on mobile
-  }}
-  className="card"
->
-  <div style={{ minWidth: '120px' }}>Active household:</div>
-  <select
-    value={householdId}
-    onChange={e => onSelectHousehold(e.target.value)}
-    style={{ flex: '1 1 auto', minWidth: '150px' }}
-  >
-    {households.map(h => (
-      <option key={h.id} value={h.id}>
-        {h.name} ({h.id.slice(0, 8)})
-      </option>
-    ))}
-  </select>
-
-  <button style={{ flex: '0 0 auto' }} onClick={onCreateHousehold}>
-    Create new household
-  </button>
-
-  <label
-    className="wrap"
     style={{
+      ...box,
+      marginTop: 8,
       display: 'flex',
-      alignItems: 'center',
-      gap: 6,
-      marginLeft: 'auto',
-      flex: '1 1 100%', // ✅ pushes checkbox to new line on mobile
+      flexDirection: 'column',
+      gap: 8
     }}
+    className="card"
   >
-    <input
-      type="checkbox"
-      checked={negativesAreSpend}
-      onChange={e => {
-        setNegativesAreSpend(e.target.checked);
-        localStorage.setItem('negatives_are_spend', e.target.checked ? '1' : '0');
-      }}
-    />
-    Negatives are spending (ignore credits)
-  </label>
-</div>
-      )}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <div style={{ minWidth: '120px' }}>Active household:</div>
+      <select
+        value={householdId}
+        onChange={e => onSelectHousehold(e.target.value)}
+        style={{ flex: '1 1 220px', minWidth: '180px' }}
+      >
+        {households.map(h => (
+          <option key={h.id} value={h.id}>
+            {h.name} ({h.id.slice(0, 8)})
+          </option>
+        ))}
+      </select>
+      <button onClick={onCreateHousehold}>Create new household</button>
+    </div>
+
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <label className="wrap" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <input
+          type="checkbox"
+          checked={negativesAreSpend}
+          onChange={e => {
+            setNegativesAreSpend(e.target.checked);
+            localStorage.setItem('negatives_are_spend', e.target.checked ? '1' : '0');
+          }}
+        />
+        Negatives are spending (ignore credits)
+      </label>
+    </div>
+  </div>
+)}
 
       {/* Entry row */}
       <section style={{ marginTop: 16, ...row }}>
@@ -588,31 +639,35 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
           <label>Description</label>
           <input value={form.description || ''} onChange={e=>setForm(f=>({ ...f, description: e.target.value }))} placeholder="Skin serum" />
         </div>
-        <div style={{ gridColumn: 'span 2' }}>
-          <label>Amount (AUD)</label>
-          <input
-            type="text"
-            name="amount"
-            autoComplete="off"
-            inputMode="decimal"
-            enterKeyHint="done"
-            pattern="[0-9]*[.,]?[0-9]*"
-            placeholder="0.00"
-            value={form.amount === undefined ? '' : String(form.amount)}
-            onFocus={e => e.currentTarget.select()}
-            onChange={e => {
-              const raw = e.target.value.replace(/[^0-9.,]/g, '');
-              if (raw === '') {
-                setForm(f => ({ ...f, amount: undefined }));
-                return;
-                }
-              const normalized = raw.replace(',', '.');
-              const num = Number(normalized);
-              if (!isNaN(num)) setForm(f => ({ ...f, amount: num }));
-            }}
-            style={{ width: '100%', fontSize: '16px' }}
-          />
-        </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+  <label>Amount (AUD)</label>
+  <input
+    type="text"
+    name="amount"
+    autoComplete="off"
+    inputMode="decimal"
+    enterKeyHint="done"
+    pattern="[0-9]*[.,]?[0-9]*"
+    placeholder="0.00"
+    value={amountText}
+    onFocus={e => e.currentTarget.select()}
+    onChange={e => {
+      // Keep exactly what the user typed (incl. a trailing .) to avoid iOS issues
+      const raw = e.target.value.replace(/[^0-9.,]/g, '');
+      setAmountText(raw);
+    }}
+    onBlur={() => {
+      const normalized = amountText.replace(',', '.');
+      if (normalized === '' || normalized === '.' || normalized === ',') {
+        setForm(f => ({ ...f, amount: undefined }));
+        return;
+      }
+      const num = Number(normalized);
+      if (!isNaN(num)) setForm(f => ({ ...f, amount: num }));
+    }}
+    style={{ width: '100%', fontSize: '16px' }}
+  />
+</div>
         <div style={{ gridColumn: 'span 3' }}>
           <label>Category</label>
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -627,28 +682,35 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
           <button onClick={onAdd}>Add</button>
           <input type="file" accept=".csv,.xlsx,.xls" onChange={e=>{ const f=e.target.files?.[0]; if (f) onImport(f); }} />
         </div>
-        <div className="full-on-mobile" style={{ display:'flex', alignItems:'center', gap: 6 }}>
-          <input type="checkbox" checked={onlySpending} onChange={e=>setOnlySpending(e.target.checked)} />
-          Show only spending
-        </div>
         <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 8,
-            justifyContent: 'space-between',
-            width: '100%',
-          }}
-        >
-          <div style={{ flex: '1 1 48%', minWidth: '160px' }}>
-            <label>From</label>
-            <input type="date" value={from} onChange={e => setFrom(e.target.value)} style={{ width: '100%' }} />
-          </div>
-          <div style={{ flex: '1 1 48%', minWidth: '160px' }}>
-            <label>To</label>
-            <input type="date" value={to} onChange={e => setTo(e.target.value)} style={{ width: '100%' }} />
-          </div>
-        </div>
+  style={{
+    gridColumn: '1 / -1',
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'flex-end',
+    gap: 12,
+    width: '100%',
+  }}
+>
+  <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+    <input
+      type="checkbox"
+      checked={onlySpending}
+      onChange={e => setOnlySpending(e.target.checked)}
+    />
+    Show only spending
+  </label>
+
+  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <label style={{ minWidth: 36 }}>From</label>
+    <input type="date" value={from} onChange={e => setFrom(e.target.value)} />
+  </div>
+
+  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <label style={{ minWidth: 20 }}>To</label>
+    <input type="date" value={to} onChange={e => setTo(e.target.value)} />
+  </div>
+</div>
       </section>
 
       {/* Totals */}
@@ -773,14 +835,48 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
         <h3>Transactions</h3>
         <div style={{ maxHeight: '60vh', overflowX: 'auto', overflowY: 'auto', border: '1px solid #eee', borderRadius: 8, width:'100%' }} className="card">
           <table style={{ width: '100%', fontSize: 14 }}>
-            <thead>
+            <thead style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 2 }}>
               <tr style={{ textAlign: 'left', borderBottom: '1px solid #eee' }}>
-                <th style={{ padding: '8px 6px' }}>Date</th>
-                <th style={{ padding: '8px 6px' }}>Merchant</th>
-                <th style={{ padding: '8px 6px' }}>Description (editable)</th>
-                <th style={{ padding: '8px 6px', textAlign:'right' }}>Amount</th>
-                <th style={{ padding: '8px 6px' }}>Category</th>
-                <th style={{ padding: '8px 6px' }}>Actions</th>
+                <th
+                  style={{ padding: '8px 6px', cursor: 'pointer', background: '#fff' }}
+                  onClick={() => {
+                    setSortDir(prev => (sortBy === 'date' ? (prev === 'asc' ? 'desc' : 'asc') : 'asc'));
+                    setSortBy('date');
+                  }}
+                >
+                  Date {sortBy === 'date' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+                </th>
+                <th
+                  style={{ padding: '8px 6px', cursor: 'pointer', background: '#fff' }}
+                  onClick={() => {
+                    setSortDir(prev => (sortBy === 'merchant' ? (prev === 'asc' ? 'desc' : 'asc') : 'asc'));
+                    setSortBy('merchant');
+                  }}
+                >
+                  Merchant {sortBy === 'merchant' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+                </th>
+                <th style={{ padding: '8px 6px', background: '#fff' }}>
+                  Description (editable)
+                </th>
+                <th
+                  style={{ padding: '8px 6px', textAlign: 'right', cursor: 'pointer', background: '#fff' }}
+                  onClick={() => {
+                    setSortDir(prev => (sortBy === 'amount' ? (prev === 'asc' ? 'desc' : 'asc') : 'asc'));
+                    setSortBy('amount');
+                  }}
+                >
+                  Amount {sortBy === 'amount' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+                </th>
+                <th
+                  style={{ padding: '8px 6px', cursor: 'pointer', background: '#fff' }}
+                  onClick={() => {
+                    setSortDir(prev => (sortBy === 'category' ? (prev === 'asc' ? 'desc' : 'asc') : 'asc'));
+                    setSortBy('category');
+                  }}
+                >
+                  Category {sortBy === 'category' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+                </th>
+                <th style={{ padding: '8px 6px', background: '#fff' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
