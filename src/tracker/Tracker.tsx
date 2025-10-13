@@ -201,7 +201,7 @@ useEffect(() => {
   rows.sort((a, b) => {
     switch (sortBy) {
       case 'merchant':
-        return a.merchant.localeCompare(b.merchant) * dir;
+        return (a.merchant || '').localeCompare(b.merchant || '') * dir;
       case 'category':
         return (a.category || '').localeCompare(b.category || '') * dir;
       case 'amount':
