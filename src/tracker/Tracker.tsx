@@ -965,8 +965,8 @@ Papa.parse<any>(file as unknown as Papa.LocalFile, {
                 <button
                   onClick={async () => {
                     if (!householdId) return;
-                    await seedDefaultCategories(householdId);
-                    setCats(await listCategories(householdId));
+                    await seedDefaultCategories(String(householdId));
+                    setCats(await safeListCategories(householdId));
                   }}
                 >
                   Seed default categories
