@@ -45,7 +45,7 @@ function loadLearnRules(hid?: string | null): Record<string, string> {
 function saveLearnRules(hid: string | null, rules: Record<string, string>) {
   try { localStorage.setItem(rulesKey(hid), JSON.stringify(rules)); } catch {}
 }
-function normKey(s: string) {
+function normKey(s?: string | null) {
   return (s || '').toUpperCase().replace(/\s+/g, ' ').trim();
 }
 function suggestCategory(merchant: string, description: string, rules: Record<string, string>) {
