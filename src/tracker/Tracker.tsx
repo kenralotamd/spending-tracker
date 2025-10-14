@@ -98,6 +98,8 @@ export default function Tracker() {
     try { return localStorage.getItem(LS_NEG_SPEND) ? localStorage.getItem(LS_NEG_SPEND) === '1' : true; } catch { return true; }
   });
   const [selectedMonth, setSelectedMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
+  const [clearBusy, setClearBusy] = useState(false);
+  const [deleteHHBusy, setDeleteHHBusy] = useState(false);
   
   function yyyymm(d: string) { return (d || '').slice(0, 7); }
   function formatMonth(ym: string) {
@@ -251,6 +253,52 @@ export default function Tracker() {
     setCats(await listCategories(id));
   }
 
+  async function onDeleteHousehold() {
+    if (!householdId) return;
+    const name = households.find(h => h.id === householdId)?.name || 'this household';
+    if (!confirm(`This will permanently delete "${name}" and all its data for everyone in it.\n\nType DELETE to confirm.`)) return;
+    const typed = prompt('Type DELETE to confirm:');
+    if (typed !== 'DELETE') return;
+    try {
+      setDeleteHHBusy(true);
+      // Try calling a helper from ../household if it exists
+      let ok = false;
+      try {
+        // dynamic import to avoid TypeScript type errors if not present
+        const mod: any = await import('../household');
+        if (typeof mod.deleteHousehold === 'function') {
+          await mod.deleteHousehold(householdId);
+          ok = true;
+        }
+      } catch {}
+      if (!ok) {
+        // Fallback to PostgREST direct delete. Requires a DELETE policy on public.households.
+        const url = import.meta.env.VITE_SUPABASE_URL as string;
+        const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+        if (!url || !key) throw new Error('Missing Supabase URL/Anon key env vars.');
+        const resp = await fetch(`${url}/rest/v1/households?id=eq.${encodeURIComponent(householdId)}`, {
+          method: 'DELETE',
+          headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: 'return=minimal' }
+        });
+        if (!resp.ok) {
+          const msg = await resp.text();
+          throw new Error(`Delete failed (${resp.status}): ${msg || 'RLS may block DELETE. Add a delete policy.'}`);
+        }
+      }
+      // Refresh local UI state
+      const updated = await listMyHouseholds();
+      setHouseholds(updated);
+      setHouseholdId(updated[0]?.id ?? null);
+      setTxns([]);
+      setCats([]);
+    } catch (e: any) {
+      alert(e?.message || 'Failed to delete household. Check RLS delete policy on public.households.');
+      console.error(e);
+    } finally {
+      setDeleteHHBusy(false);
+    }
+  }
+
   async function onAdd() {
     try {
       if (!householdId) throw new Error('Household not ready yet.');
@@ -309,6 +357,30 @@ export default function Tracker() {
     } catch (e: any) {
       alert(e?.message || 'Failed to delete');
       console.error(e);
+    }
+  }
+
+  async function onClearTransactionsInView() {
+    try {
+      if (!householdId) throw new Error('Household not ready yet.');
+      const label = from && to ? `${from} → ${to}` : 'current view';
+      if (!confirm(`Delete ALL transactions in ${label}? This cannot be undone.`)) return;
+      setClearBusy(true);
+      // Fetch the same set the user is seeing to be precise
+      const toWipe = await listTransactions(String(householdId), from || undefined, to || undefined);
+      for (const t of toWipe) {
+        if (t.id) {
+          try { await deleteTransaction(t.id); } catch {}
+        }
+      }
+      // Reload
+      const refreshed = await listTransactions(String(householdId), from || undefined, to || undefined);
+      setTxns(refreshed);
+    } catch (e: any) {
+      alert(e?.message || 'Failed to clear transactions');
+      console.error(e);
+    } finally {
+      setClearBusy(false);
     }
   }
 
@@ -556,7 +628,7 @@ export default function Tracker() {
                   marginBottom: 8,
                   letterSpacing: '-0.02em'
                 }}>
-                  💰 Spending Tracker
+                  💰 UmaYagi Spending Tracker
                 </h1>
                 <p style={{ color: '#64748b', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#10b981', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
@@ -615,20 +687,37 @@ export default function Tracker() {
                     ))}
                   </select>
                 </div>
-                <button 
-                  onClick={onCreateHousehold}
-                  style={{ 
-                    padding: '12px 24px', 
-                    background: 'linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)', 
-                    color: '#fff', 
-                    fontWeight: 600, 
-                    borderRadius: 12,
-                    boxShadow: '0 4px 12px rgba(37,99,235,0.3)',
-                    transition: 'all 0.3s'
-                  }}
-                >
-                  ➕ Create New Household
-                </button>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <button 
+                    onClick={onCreateHousehold}
+                    style={{ 
+                      padding: '12px 24px', 
+                      background: 'linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)', 
+                      color: '#fff', 
+                      fontWeight: 600, 
+                      borderRadius: 12,
+                      boxShadow: '0 4px 12px rgba(37,99,235,0.3)',
+                      transition: 'all 0.3s'
+                    }}
+                  >
+                    ➕ Create New Household
+                  </button>
+                  <button
+                    onClick={onDeleteHousehold}
+                    disabled={deleteHHBusy}
+                    style={{
+                      padding: '12px 24px',
+                      background: deleteHHBusy ? '#cbd5e1' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                      color: '#fff',
+                      fontWeight: 700,
+                      borderRadius: 12,
+                      boxShadow: '0 4px 12px rgba(239,68,68,0.25)'
+                    }}
+                    title="Delete the active household (cascades transactions &amp; budgets)"
+                  >
+                    {deleteHHBusy ? 'Deleting…' : '🗑️ Delete Household'}
+                  </button>
+                </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
                 <input
@@ -961,6 +1050,21 @@ export default function Tracker() {
             <label htmlFor="only-spend" style={{ fontSize: 14, color: '#334155', fontWeight: 500, cursor: 'pointer' }}>
               Show spending only (hide refunds/credits)
             </label>
+          </div>
+          <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              onClick={onClearTransactionsInView}
+              disabled={clearBusy || !householdId}
+              style={{
+                padding: '12px 20px',
+                background: clearBusy ? '#cbd5e1' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                color: '#fff',
+                fontWeight: 700,
+                borderRadius: 12
+              }}
+            >
+              {clearBusy ? 'Clearing…' : '🧹 Clear All in View'}
+            </button>
           </div>
         </div>
 
