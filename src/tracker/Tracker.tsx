@@ -1036,7 +1036,7 @@ export default function Tracker() {
                       <button
                         onClick={() => {
                           const newCat = prompt('Change category to:', txn.category || 'Uncategorized');
-                          if (newCat && newCat !== txn.category) onChangeCategory(txn.id, newCat);
+                          if (newCat && newCat !== txn.category) onChangeCategory(txn.id!, newCat);
                         }}
                         style={{ 
                           padding: '4px 8px', 
@@ -1051,7 +1051,7 @@ export default function Tracker() {
                       </button>
                       <button
                         onClick={() => {
-                          if (confirm('Delete this transaction?')) onDelete(txn.id);
+                          if (confirm('Delete this transaction?')) onDelete(txn.id!);
                         }}
                         style={{ 
                           padding: '4px 8px', 
