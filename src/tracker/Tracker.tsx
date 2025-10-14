@@ -77,6 +77,8 @@ function colorFor(_category: string, orderIndex: number, colorFromDb?: string | 
 
 export default function Tracker() {
   const [catsOpen, setCatsOpen] = useState(false);
+  const [txnsOpen, setTxnsOpen] = useState(true); // NEW: State for collapsible transactions
+  const [editingTxn, setEditingTxn] = useState<string | null>(null); // NEW: Track which transaction is being edited
   const [householdId, setHouseholdId] = useState<string | null>(null);
   const [households, setHouseholds] = useState<{id:string; name:string}[]>([]);
   const [householdError, setHouseholdError] = useState<string | null>(null);
@@ -293,6 +295,7 @@ export default function Tracker() {
       const updatedRules = { ...learnRules, [key]: cat };
       setLearnRules(updatedRules);
       saveLearnRules(householdId, updatedRules);
+      setEditingTxn(null); // Close the dropdown after updating
     } catch (e: any) {
       alert(e?.message || 'Failed to update category');
       console.error(e);
@@ -961,122 +964,182 @@ export default function Tracker() {
           </div>
         </div>
 
-        {/* Transactions List */}
+        {/* Transactions List - NOW COLLAPSIBLE */}
         <div className="card" style={{ padding: 24, marginBottom: 24 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
-            💳 <span>Recent Transactions ({filtered.length})</span>
-          </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {filtered.map(txn => (
-              <div 
-                key={txn.id}
-                style={{ 
-                  padding: 16, 
-                  background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                  border: '2px solid #e2e8f0',
-                  borderRadius: 16,
-                  transition: 'all 0.3s',
-                  cursor: 'pointer'
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.borderColor = '#3b82f6';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(59,130,246,0.15)';
-                  e.currentTarget.style.transform = 'translateX(4px)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.borderColor = '#e2e8f0';
-                  e.currentTarget.style.boxShadow = 'none';
-                  e.currentTarget.style.transform = 'translateX(0)';
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
-                  <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                      <div style={{ 
-                        width: 10, 
-                        height: 10, 
-                        borderRadius: '50%', 
-                        background: catColorMap[txn.category || 'Uncategorized'],
-                        flexShrink: 0,
-                        boxShadow: `0 0 8px ${catColorMap[txn.category || 'Uncategorized']}60`
-                      }} />
-                      <span style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {txn.merchant}
-                      </span>
-                      <span style={{ 
-                        fontSize: 11, 
-                        padding: '2px 8px', 
-                        background: '#f1f5f9', 
-                        color: '#64748b', 
-                        borderRadius: 6, 
-                        fontWeight: 600,
-                        flexShrink: 0
-                      }}>
-                        {txn.person}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 13, color: '#64748b', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {txn.description}
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 12, color: '#94a3b8' }}>
-                      <span>📅 {new Date(txn.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</span>
-                      <span>•</span>
-                      <span>🏷️ {txn.category || 'Uncategorized'}</span>
-                      <span>•</span>
-                      <span style={{ fontSize: 10, padding: '1px 6px', background: txn.source === 'import' ? '#dbeafe' : '#fef3c7', color: txn.source === 'import' ? '#1e40af' : '#92400e', borderRadius: 4, fontWeight: 600 }}>
-                        {txn.source}
-                      </span>
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: txn.amount > 0 ? '#ef4444' : '#10b981', marginBottom: 4 }}>
-                      ${Math.abs(txn.amount).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </div>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <button
-                        onClick={() => {
-                          const newCat = prompt('Change category to:', txn.category || 'Uncategorized');
-                          if (newCat && newCat !== txn.category) onChangeCategory(txn.id!, newCat);
-                        }}
-                        style={{ 
-                          padding: '4px 8px', 
+          <div 
+            onClick={() => setTxnsOpen(!txnsOpen)}
+            style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              cursor: 'pointer',
+              padding: '4px 0',
+              marginBottom: txnsOpen ? 20 : 0
+            }}
+          >
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              💳 <span>Recent Transactions ({filtered.length})</span>
+            </h2>
+            <span style={{ fontSize: 24, transition: 'transform 0.3s', transform: txnsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+              ⌄
+            </span>
+          </div>
+          {txnsOpen && (
+            <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {filtered.map(txn => (
+                <div 
+                  key={txn.id}
+                  style={{ 
+                    padding: 16, 
+                    background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                    border: '2px solid #e2e8f0',
+                    borderRadius: 16,
+                    transition: 'all 0.3s',
+                    cursor: 'pointer'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.borderColor = '#3b82f6';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(59,130,246,0.15)';
+                    e.currentTarget.style.transform = 'translateX(4px)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.transform = 'translateX(0)';
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+                    <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                        <div style={{ 
+                          width: 10, 
+                          height: 10, 
+                          borderRadius: '50%', 
+                          background: catColorMap[txn.category || 'Uncategorized'],
+                          flexShrink: 0,
+                          boxShadow: `0 0 8px ${catColorMap[txn.category || 'Uncategorized']}60`
+                        }} />
+                        <span style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {txn.merchant}
+                        </span>
+                        <span style={{ 
                           fontSize: 11, 
+                          padding: '2px 8px', 
                           background: '#f1f5f9', 
-                          color: '#475569',
+                          color: '#64748b', 
+                          borderRadius: 6, 
                           fontWeight: 600,
-                          borderRadius: 6
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (confirm('Delete this transaction?')) onDelete(txn.id!);
-                        }}
-                        style={{ 
-                          padding: '4px 8px', 
-                          fontSize: 11, 
-                          background: '#fee2e2', 
-                          color: '#991b1b',
-                          fontWeight: 600,
-                          borderRadius: 6
-                        }}
-                      >
-                        Delete
-                      </button>
+                          flexShrink: 0
+                        }}>
+                          {txn.person}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 13, color: '#64748b', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {txn.description}
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 12, color: '#94a3b8' }}>
+                        <span>📅 {new Date(txn.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</span>
+                        <span>•</span>
+                        <span>🏷️ {txn.category || 'Uncategorized'}</span>
+                        <span>•</span>
+                        <span style={{ fontSize: 10, padding: '1px 6px', background: txn.source === 'import' ? '#dbeafe' : '#fef3c7', color: txn.source === 'import' ? '#1e40af' : '#92400e', borderRadius: 4, fontWeight: 600 }}>
+                          {txn.source}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: txn.amount > 0 ? '#ef4444' : '#10b981', marginBottom: 4 }}>
+                        ${Math.abs(txn.amount).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                        {editingTxn === txn.id ? (
+                          // DROPDOWN MODE
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            <select
+                              value={txn.category || 'Uncategorized'}
+                              onChange={e => onChangeCategory(txn.id!, e.target.value)}
+                              onClick={e => e.stopPropagation()}
+                              style={{
+                                padding: '4px 8px',
+                                fontSize: 11,
+                                background: '#fff',
+                                border: '2px solid #3b82f6',
+                                color: '#334155',
+                                fontWeight: 600,
+                                borderRadius: 6,
+                                minWidth: 120
+                              }}
+                            >
+                              {categoryNames.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingTxn(null);
+                              }}
+                              style={{ 
+                                padding: '4px 8px', 
+                                fontSize: 11, 
+                                background: '#f1f5f9', 
+                                color: '#475569',
+                                fontWeight: 600,
+                                borderRadius: 6
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          // BUTTON MODE
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingTxn(txn.id!);
+                              }}
+                              style={{ 
+                                padding: '4px 8px', 
+                                fontSize: 11, 
+                                background: '#f1f5f9', 
+                                color: '#475569',
+                                fontWeight: 600,
+                                borderRadius: 6
+                              }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm('Delete this transaction?')) onDelete(txn.id!);
+                              }}
+                              style={{ 
+                                padding: '4px 8px', 
+                                fontSize: 11, 
+                                background: '#fee2e2', 
+                                color: '#991b1b',
+                                fontWeight: 600,
+                                borderRadius: 6
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
-            {filtered.length === 0 && (
-              <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
-                <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
-                <div style={{ fontSize: 16, fontWeight: 600 }}>No transactions found</div>
-                <div style={{ fontSize: 14, marginTop: 4 }}>Add a transaction or import from your bank</div>
-              </div>
-            )}
-          </div>
+              ))}
+              {filtered.length === 0 && (
+                <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
+                  <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
+                  <div style={{ fontSize: 16, fontWeight: 600 }}>No transactions found</div>
+                  <div style={{ fontSize: 14, marginTop: 4 }}>Add a transaction or import from your bank</div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Categories Management */}
