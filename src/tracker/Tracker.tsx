@@ -95,7 +95,6 @@ export default function Tracker() {
   const [negativesAreSpend, setNegativesAreSpend] = useState<boolean>(() => {
     try { return localStorage.getItem(LS_NEG_SPEND) ? localStorage.getItem(LS_NEG_SPEND) === '1' : true; } catch { return true; }
   });
-  const [dashTab, setDashTab] = useState<'current' | 'archive'>('current');
   const [selectedMonth, setSelectedMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
   
   function yyyymm(d: string) { return (d || '').slice(0, 7); }
@@ -296,16 +295,6 @@ export default function Tracker() {
       saveLearnRules(householdId, updatedRules);
     } catch (e: any) {
       alert(e?.message || 'Failed to update category');
-      console.error(e);
-    }
-  }
-
-  async function onChangeDescription(id: string, desc: string) {
-    try {
-      const saved = await updateTransaction(id, { description: desc });
-      setTxns(prev => prev.map(x => x.id === id ? saved : x));
-    } catch (e: any) {
-      alert(e?.message || 'Failed to update description');
       console.error(e);
     }
   }
@@ -1148,7 +1137,7 @@ export default function Tracker() {
                   >
                     <input
                       type="color"
-                      value={c.color || colorFor(c.name, 0)}
+                      value={c.color || colorFor(c.name, 0, c.color)}
                       onChange={e => onSetColor(c, e.target.value)}
                       style={{ width: 32, height: 32, cursor: 'pointer', border: '2px solid #cbd5e1', borderRadius: 8, padding: 2 }}
                     />
