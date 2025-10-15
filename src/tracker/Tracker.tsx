@@ -955,18 +955,36 @@ export default function Tracker() {
                 </div>
                 <div style={{ gridColumn:'span 2' }}>
                   <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#475569', marginBottom:8 }}>Merchant</label>
-                  <input 
-                    value={form.merchant || ''} 
+                  <input
+                    value={form.merchant || ''}
                     onChange={e=>setForm(f=>({ ...f, merchant: e.target.value }))}
                     placeholder="Woolworths, Coles, etc."
+                    style={{
+                      width: '100%',
+                      fontSize: 15,
+                      padding: '10px 12px',
+                      borderRadius: 8,
+                      boxSizing: 'border-box',
+                      overflow: 'hidden',
+                      height: 40
+                    }}
                   />
                 </div>
                 <div style={{ gridColumn:'span 2' }}>
                   <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#475569', marginBottom:8 }}>Description</label>
-                  <input 
-                    value={form.description || ''} 
+                  <input
+                    value={form.description || ''}
                     onChange={e=>setForm(f=>({ ...f, description: e.target.value }))}
                     placeholder="Weekly groceries"
+                    style={{
+                      width: '100%',
+                      fontSize: 15,
+                      padding: '10px 12px',
+                      borderRadius: 8,
+                      boxSizing: 'border-box',
+                      overflow: 'hidden',
+                      height: 40
+                    }}
                   />
                 </div>
                 <div>
@@ -1365,7 +1383,14 @@ export default function Tracker() {
                       style={{ width: 32, height: 32, cursor: 'pointer', border: '2px solid #cbd5e1', borderRadius: 8, padding: 2 }}
                     />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: '#334155',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
                         {c.name}
                       </div>
                     </div>
