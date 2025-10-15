@@ -83,8 +83,8 @@ function colorFor(_category: string, orderIndex: number, colorFromDb?: string | 
 
 export default function Tracker() {
   const [catsOpen, setCatsOpen] = useState(false);
-  const [txnsOpen, setTxnsOpen] = useState(true); // NEW: State for collapsible transactions
-  const [editingTxn, setEditingTxn] = useState<string | null>(null); // NEW: Track which transaction is being edited
+  const [txnsOpen, setTxnsOpen] = useState(true);
+  const [editingTxn, setEditingTxn] = useState<string | null>(null);
   const [householdId, setHouseholdId] = useState<string | null>(null);
   const [households, setHouseholds] = useState<{id:string; name:string}[]>([]);
   const [householdError, setHouseholdError] = useState<string | null>(null);
@@ -258,7 +258,6 @@ export default function Tracker() {
         role: 'member'
       });
       if (error) throw error;
-      // refresh households and switch active
       const list = await listMyHouseholds();
       setHouseholds(list);
       const joined = list.find(h => h.id === joinId.trim());
@@ -300,10 +299,8 @@ export default function Tracker() {
     if (typed !== 'DELETE') return;
     try {
       setDeleteHHBusy(true);
-      // Try calling a helper from ../household if it exists
       let ok = false;
       try {
-        // dynamic import to avoid TypeScript type errors if not present
         const mod: any = await import('../household');
         if (typeof mod.deleteHousehold === 'function') {
           await mod.deleteHousehold(householdId);
@@ -311,7 +308,6 @@ export default function Tracker() {
         }
       } catch {}
       if (!ok) {
-        // Fallback to PostgREST direct delete. Requires a DELETE policy on public.households.
         const url = import.meta.env.VITE_SUPABASE_URL as string;
         const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
         if (!url || !key) throw new Error('Missing Supabase URL/Anon key env vars.');
@@ -324,7 +320,6 @@ export default function Tracker() {
           throw new Error(`Delete failed (${resp.status}): ${msg || 'RLS may block DELETE. Add a delete policy.'}`);
         }
       }
-      // Refresh local UI state
       const updated = await listMyHouseholds();
       setHouseholds(updated);
       setHouseholdId(updated[0]?.id ?? null);
@@ -382,7 +377,7 @@ export default function Tracker() {
       const updatedRules = { ...learnRules, [key]: cat };
       setLearnRules(updatedRules);
       saveLearnRules(householdId, updatedRules);
-      setEditingTxn(null); // Close the dropdown after updating
+      setEditingTxn(null);
     } catch (e: any) {
       alert(e?.message || 'Failed to update category');
       console.error(e);
@@ -405,14 +400,12 @@ export default function Tracker() {
       const label = from && to ? `${from} → ${to}` : 'current view';
       if (!confirm(`Delete ALL transactions in ${label}? This cannot be undone.`)) return;
       setClearBusy(true);
-      // Fetch the same set the user is seeing to be precise
       const toWipe = await listTransactions(String(householdId), from || undefined, to || undefined);
       for (const t of toWipe) {
         if (t.id) {
           try { await deleteTransaction(t.id); } catch {}
         }
       }
-      // Reload
       const refreshed = await listTransactions(String(householdId), from || undefined, to || undefined);
       setTxns(refreshed);
     } catch (e: any) {
@@ -706,10 +699,8 @@ export default function Tracker() {
           </div>
         )}
         
-        {/* Household Selector (compact top bar + modal) */}
         {householdId && (
           <>
-            {/* Top bar: shows active household + button */}
             <div className="card" style={{ padding: 16, marginBottom: 16, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <span className="status-dot status-online" />
@@ -722,7 +713,6 @@ export default function Tracker() {
               </button>
             </div>
 
-            {/* Modal with full household settings */}
             {showHH && (
               <div style={{
                 position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'flex',
@@ -924,7 +914,7 @@ export default function Tracker() {
           </div>
         </div>
 
-        {/* Add Spending (button + modal) */}
+        {/* Add Spending */}
         <div className="card" style={{ padding: 16, marginBottom: 24, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', margin: 0, display:'flex', alignItems:'center', gap:8 }}>
             ➕ <span>Add Spending</span>
@@ -953,38 +943,20 @@ export default function Tracker() {
                     onChange={e=>setForm(f=>({ ...f, date: e.target.value }))}
                   />
                 </div>
-                <div style={{ gridColumn:'span 2' }}>
+                <div>
                   <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#475569', marginBottom:8 }}>Merchant</label>
                   <input
                     value={form.merchant || ''}
                     onChange={e=>setForm(f=>({ ...f, merchant: e.target.value }))}
                     placeholder="Woolworths, Coles, etc."
-                    style={{
-                      width: '100%',
-                      fontSize: 15,
-                      padding: '10px 12px',
-                      borderRadius: 8,
-                      boxSizing: 'border-box',
-                      overflow: 'hidden',
-                      height: 40
-                    }}
                   />
                 </div>
-                <div style={{ gridColumn:'span 2' }}>
+                <div>
                   <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#475569', marginBottom:8 }}>Description</label>
                   <input
                     value={form.description || ''}
                     onChange={e=>setForm(f=>({ ...f, description: e.target.value }))}
                     placeholder="Weekly groceries"
-                    style={{
-                      width: '100%',
-                      fontSize: 15,
-                      padding: '10px 12px',
-                      borderRadius: 8,
-                      boxSizing: 'border-box',
-                      overflow: 'hidden',
-                      height: 40
-                    }}
                   />
                 </div>
                 <div>
@@ -1142,7 +1114,7 @@ export default function Tracker() {
           </div>
         </div>
 
-        {/* Transactions List - NOW COLLAPSIBLE */}
+        {/* Transactions List */}
         <div className="card" style={{ padding: 24, marginBottom: 24 }}>
           <div 
             onClick={() => setTxnsOpen(!txnsOpen)}
@@ -1231,7 +1203,6 @@ export default function Tracker() {
                       </div>
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                         {editingTxn === txn.id ? (
-                          // DROPDOWN MODE
                           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                             <select
                               value={txn.category || 'Uncategorized'}
@@ -1268,7 +1239,6 @@ export default function Tracker() {
                             </button>
                           </div>
                         ) : (
-                          // BUTTON MODE
                           <>
                             <button
                               onClick={(e) => {
@@ -1311,7 +1281,7 @@ export default function Tracker() {
               ))}
               {filtered.length === 0 && (
                 <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
-                  <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
+                  <div style={{ fontSize: 48, marginBottom: 12 }}>🔭</div>
                   <div style={{ fontSize: 16, fontWeight: 600 }}>No transactions found</div>
                   <div style={{ fontSize: 14, marginTop: 4 }}>Add a transaction or import from your bank</div>
                 </div>
@@ -1362,7 +1332,7 @@ export default function Tracker() {
                   ➕ Add
                 </button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
                 {cats.map(c => (
                   <div 
                     key={c.id}
@@ -1380,13 +1350,13 @@ export default function Tracker() {
                       type="color"
                       value={c.color || colorFor(c.name, 0, c.color)}
                       onChange={e => onSetColor(c, e.target.value)}
-                      style={{ width: 32, height: 32, cursor: 'pointer', border: '2px solid #cbd5e1', borderRadius: 8, padding: 2 }}
+                      style={{ width: 32, height: 32, cursor: 'pointer', border: '2px solid #cbd5e1', borderRadius: 8, padding: 2, flexShrink: 0 }}
                     />
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ flex: 1, overflow: 'hidden' }}>
                       <div style={{
                         fontSize: 14,
                         fontWeight: 600,
-                        color: '#334155',
+                        color: '#0f172a',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap'
@@ -1394,18 +1364,20 @@ export default function Tracker() {
                         {c.name}
                       </div>
                     </div>
-                    <button
-                      onClick={() => onRenameCategory(c)}
-                      style={{ padding: '4px 8px', fontSize: 11, background: '#f1f5f9', color: '#475569', fontWeight: 600, borderRadius: 6 }}
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      onClick={() => onDeleteCategory(c)}
-                      style={{ padding: '4px 8px', fontSize: 11, background: '#fee2e2', color: '#991b1b', fontWeight: 600, borderRadius: 6 }}
-                    >
-                      🗑️
-                    </button>
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      <button
+                        onClick={() => onRenameCategory(c)}
+                        style={{ padding: '4px 8px', fontSize: 11, background: '#f1f5f9', color: '#475569', fontWeight: 600, borderRadius: 6 }}
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => onDeleteCategory(c)}
+                        style={{ padding: '4px 8px', fontSize: 11, background: '#fee2e2', color: '#991b1b', fontWeight: 600, borderRadius: 6 }}
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
