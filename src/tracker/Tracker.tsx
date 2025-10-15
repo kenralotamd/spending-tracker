@@ -100,6 +100,9 @@ export default function Tracker() {
   const [selectedMonth, setSelectedMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
   const [clearBusy, setClearBusy] = useState(false);
   const [deleteHHBusy, setDeleteHHBusy] = useState(false);
+  const [showHH, setShowHH] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [joinId, setJoinId] = useState('');
   
   function yyyymm(d: string) { return (d || '').slice(0, 7); }
   function formatMonth(ym: string) {
@@ -236,6 +239,37 @@ export default function Tracker() {
       .sort((a, b) => b.spend - a.spend);
     return { totalOut: found.total, catRows };
   }, [monthsList, selectedMonth]);
+
+  async function joinHouseholdById() {
+    try {
+      if (!joinId.trim()) { alert('Enter a household ID to join.'); return; }
+      const { supabase } = await import('../supabase');
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr || !userData?.user?.id) throw new Error('Not signed in.');
+      const myId = userData.user.id;
+      const { error } = await supabase.from('household_members').insert({
+        household_id: joinId.trim(),
+        user_id: myId,
+        role: 'member'
+      });
+      if (error) throw error;
+      // refresh households and switch active
+      const list = await listMyHouseholds();
+      setHouseholds(list);
+      const joined = list.find(h => h.id === joinId.trim());
+      if (joined) {
+        await onSelectHousehold(joined.id);
+        setShowHH(false);
+        setJoinId('');
+        alert('Joined household successfully.');
+      } else {
+        alert('Joined, but could not find household in list. Try refreshing.');
+      }
+    } catch (e: any) {
+      alert(e?.message || 'Failed to join household. Make sure the ID is correct and policies allow joining.');
+      console.error(e);
+    }
+  }
 
   async function onSelectHousehold(id: string) {
     setActiveHousehold(id);
@@ -667,75 +701,103 @@ export default function Tracker() {
           </div>
         )}
         
-        {/* Household Selector */}
+        {/* Household Selector (compact top bar + modal) */}
         {householdId && (
-          <div className="card" style={{ padding: 24, marginBottom: 24 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-              🏠 <span>Household Settings</span>
-            </h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}>
-                <div style={{ flex: '1 1 280px', minWidth: 200 }}>
-                  <label style={{ display: 'block', fontSize: 14, fontWeight: 600, color: '#475569', marginBottom: 8 }}>Active Household</label>
-                  <select
-                    value={householdId}
-                    onChange={e => onSelectHousehold(e.target.value)}
-                    style={{ width: '100%', padding: '12px 16px', fontSize: 16 }}
-                  >
-                    {households.map(h => (
-                      <option key={h.id} value={h.id}>{h.name} ({h.id.slice(0, 8)})</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  <button 
-                    onClick={onCreateHousehold}
-                    style={{ 
-                      padding: '12px 24px', 
-                      background: 'linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)', 
-                      color: '#fff', 
-                      fontWeight: 600, 
-                      borderRadius: 12,
-                      boxShadow: '0 4px 12px rgba(37,99,235,0.3)',
-                      transition: 'all 0.3s'
-                    }}
-                  >
-                    ➕ Create New Household
-                  </button>
-                  <button
-                    onClick={onDeleteHousehold}
-                    disabled={deleteHHBusy}
-                    style={{
-                      padding: '12px 24px',
-                      background: deleteHHBusy ? '#cbd5e1' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                      color: '#fff',
-                      fontWeight: 700,
-                      borderRadius: 12,
-                      boxShadow: '0 4px 12px rgba(239,68,68,0.25)'
-                    }}
-                    title="Delete the active household (cascades transactions &amp; budgets)"
-                  >
-                    {deleteHHBusy ? 'Deleting…' : '🗑️ Delete Household'}
-                  </button>
+          <>
+            {/* Top bar: shows active household + button */}
+            <div className="card" style={{ padding: 16, marginBottom: 16, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <span className="status-dot status-online" />
+                <div style={{ fontWeight: 700, color:'#0f172a' }}>
+                  Active: {households.find(h => h.id === householdId)?.name || '—'} ({householdId.slice(0,8)})
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
-                <input
-                  type="checkbox"
-                  id="neg-spend"
-                  checked={negativesAreSpend}
-                  onChange={e => {
-                    setNegativesAreSpend(e.target.checked);
-                    localStorage.setItem('negatives_are_spend', e.target.checked ? '1' : '0');
-                  }}
-                  style={{ width: 20, height: 20 }}
-                />
-                <label htmlFor="neg-spend" style={{ fontSize: 14, color: '#334155', fontWeight: 500, cursor: 'pointer' }}>
-                  Treat negative amounts as spending (ignore credits/refunds)
-                </label>
-              </div>
+              <button onClick={()=>setShowHH(true)} className="inline-button" style={{ background:'linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)', color:'#fff' }}>
+                Household settings
+              </button>
             </div>
-          </div>
+
+            {/* Modal with full household settings */}
+            {showHH && (
+              <div style={{
+                position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'flex',
+                alignItems:'center', justifyContent:'center', zIndex:10000, padding:20
+              }}>
+                <div className="card" style={{ width:'min(720px, 96vw)', padding:24 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                    <h2 style={{ fontSize:18 }}>🏠 Household Settings</h2>
+                    <button onClick={()=>setShowHH(false)} className="inline-button">Close</button>
+                  </div>
+
+                  <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+                    <div>
+                      <label style={{ display:'block', fontSize:14, fontWeight:600, color:'#475569', marginBottom:8 }}>Select household</label>
+                      <select
+                        value={householdId}
+                        onChange={e => onSelectHousehold(e.target.value)}
+                        style={{ width:'100%' }}
+                      >
+                        {households.map(h => (
+                          <option key={h.id} value={h.id}>{h.name} ({h.id.slice(0, 8)})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+                      <button 
+                        onClick={onCreateHousehold}
+                        style={{ background:'linear-gradient(135deg, #10b981 0%, #059669 100%)', color:'#fff' }}
+                      >
+                        ➕ Create new household
+                      </button>
+                      <button
+                        onClick={onDeleteHousehold}
+                        disabled={deleteHHBusy}
+                        style={{ background: deleteHHBusy ? '#cbd5e1' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color:'#fff' }}
+                        title="Delete the active household (cascades transactions &amp; budgets)"
+                      >
+                        {deleteHHBusy ? 'Deleting…' : '🗑️ Delete household'}
+                      </button>
+                    </div>
+
+                    <div className="card" style={{ padding:16 }}>
+                      <h3 style={{ fontSize:14, marginBottom:8, color:'#1e293b' }}>Share / Join</h3>
+                      <div style={{ fontSize:13, color:'#475569', marginBottom:8 }}>
+                        Share this ID with your wife to join the same workspace: <strong>{householdId}</strong>
+                      </div>
+                      <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                        <input
+                          value={joinId}
+                          onChange={e=>setJoinId(e.target.value)}
+                          placeholder="Enter household ID to join"
+                          style={{ flex:'1 1 260px' }}
+                        />
+                        <button onClick={joinHouseholdById} style={{ background:'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color:'#fff' }}>
+                          Join household
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 16px', background:'#f8fafc', borderRadius:12, border:'1px solid #e2e8f0' }}>
+                      <input
+                        type="checkbox"
+                        id="neg-spend"
+                        checked={negativesAreSpend}
+                        onChange={e => {
+                          setNegativesAreSpend(e.target.checked);
+                          localStorage.setItem('negatives_are_spend', e.target.checked ? '1' : '0');
+                        }}
+                        style={{ width:20, height:20 }}
+                      />
+                      <label htmlFor="neg-spend" style={{ fontSize:14, color:'#334155', fontWeight:500, cursor:'pointer' }}>
+                        Treat negative amounts as spending (ignore credits/refunds)
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Stats Cards Grid */}
@@ -857,119 +919,108 @@ export default function Tracker() {
           </div>
         </div>
 
-        {/* Add Transaction Form */}
-        <div className="card" style={{ padding: 24, marginBottom: 24 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
-            ➕ <span>Add Transaction</span>
+        {/* Add Spending (button + modal) */}
+        <div className="card" style={{ padding: 16, marginBottom: 24, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', margin: 0, display:'flex', alignItems:'center', gap:8 }}>
+            ➕ <span>Add Spending</span>
           </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-            <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 8 }}>Date</label>
-              <input 
-                type="date" 
-                value={form.date || ''} 
-                onChange={e=>setForm(f=>({ ...f, date: e.target.value }))}
-                style={{ width: '100%', fontSize: 16 }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 8 }}>Person</label>
-              <select 
-                value={(form.person as any) || 'Both'} 
-                onChange={e=>setForm(f=>({ ...f, person: e.target.value as any }))}
-                style={{ width: '100%', fontSize: 16 }}
-              >
-                <option>Ken</option><option>Wife</option><option>Both</option>
-              </select>
-            </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 8 }}>Merchant</label>
-              <input 
-                value={form.merchant || ''} 
-                onChange={e=>setForm(f=>({ ...f, merchant: e.target.value }))}
-                placeholder="Woolworths, Coles, etc."
-                style={{ width: '100%', fontSize: 16 }}
-              />
-            </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 8 }}>Description</label>
-              <input 
-                value={form.description || ''} 
-                onChange={e=>setForm(f=>({ ...f, description: e.target.value }))}
-                placeholder="Weekly groceries"
-                style={{ width: '100%', fontSize: 16 }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 8 }}>Amount (AUD)</label>
-              <input
-                type="text"
-                name="amount"
-                autoComplete="off"
-                inputMode="decimal"
-                enterKeyHint="done"
-                pattern="[0-9]*[.,]?[0-9]*"
-                placeholder="0.00"
-                value={amountText}
-                onFocus={e => e.currentTarget.select()}
-                onChange={e => {
-                  const raw = e.target.value.replace(/[^0-9.,]/g, '');
-                  setAmountText(raw);
-                }}
-                onBlur={() => {
-                  const normalized = amountText.replace(',', '.');
-                  if (normalized === '' || normalized === '.' || normalized === ',') {
-                    setForm(f => ({ ...f, amount: undefined }));
-                    return;
-                  }
-                  const num = Number(normalized);
-                  if (!isNaN(num)) setForm(f => ({ ...f, amount: num }));
-                }}
-                style={{ width: '100%', fontSize: 16 }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 8 }}>Category</label>
-              <div style={{ position: 'relative' }}>
-                <div style={{ 
-                  position: 'absolute', 
-                  left: 16, 
-                  top: '50%', 
-                  transform: 'translateY(-50%)', 
-                  width: 12, 
-                  height: 12, 
-                  borderRadius: '50%', 
-                  background: catColorMap[form.category || 'Uncategorized'],
-                  pointerEvents: 'none',
-                  zIndex: 1
-                }} />
-                <select 
-                  value={form.category || 'Uncategorized'} 
-                  onChange={e=>setForm(f=>({ ...f, category: e.target.value }))}
-                  style={{ width: '100%', paddingLeft: 40, fontSize: 16 }}
-                >
-                  {categoryNames.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={onAdd}
-            style={{ 
-              marginTop: 20, 
-              width: '100%', 
-              padding: '14px 28px', 
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
-              color: '#fff', 
-              fontWeight: 700,
-              fontSize: 16,
-              borderRadius: 12,
-              boxShadow: '0 4px 12px rgba(16,185,129,0.3)'
-            }}
-          >
-            💾 Save Transaction
+          <button onClick={()=>setShowAdd(true)} style={{ background:'linear-gradient(135deg, #10b981 0%, #059669 100%)', color:'#fff' }}>
+            Add Spending
           </button>
         </div>
+
+        {showAdd && (
+          <div style={{
+            position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'flex',
+            alignItems:'center', justifyContent:'center', zIndex:10000, padding:20
+          }}>
+            <div className="card" style={{ width:'min(720px, 96vw)', padding:24 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                <h2 style={{ fontSize:18 }}>Add Spending</h2>
+                <button onClick={()=>setShowAdd(false)} className="inline-button">Close</button>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:16 }}>
+                <div>
+                  <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#475569', marginBottom:8 }}>Date</label>
+                  <input 
+                    type="date" 
+                    value={form.date || ''} 
+                    onChange={e=>setForm(f=>({ ...f, date: e.target.value }))}
+                  />
+                </div>
+                <div style={{ gridColumn:'span 2' }}>
+                  <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#475569', marginBottom:8 }}>Merchant</label>
+                  <input 
+                    value={form.merchant || ''} 
+                    onChange={e=>setForm(f=>({ ...f, merchant: e.target.value }))}
+                    placeholder="Woolworths, Coles, etc."
+                  />
+                </div>
+                <div style={{ gridColumn:'span 2' }}>
+                  <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#475569', marginBottom:8 }}>Description</label>
+                  <input 
+                    value={form.description || ''} 
+                    onChange={e=>setForm(f=>({ ...f, description: e.target.value }))}
+                    placeholder="Weekly groceries"
+                  />
+                </div>
+                <div>
+                  <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#475569', marginBottom:8 }}>Amount (AUD)</label>
+                  <input
+                    type="text"
+                    name="amount"
+                    autoComplete="off"
+                    inputMode="decimal"
+                    enterKeyHint="done"
+                    pattern="[0-9]*[.,]?[0-9]*"
+                    placeholder="0.00"
+                    value={amountText}
+                    onFocus={e => e.currentTarget.select()}
+                    onChange={e => {
+                      const raw = e.target.value.replace(/[^0-9.,]/g, '');
+                      setAmountText(raw);
+                    }}
+                    onBlur={() => {
+                      const normalized = amountText.replace(',', '.');
+                      if (normalized === '' || normalized === '.' || normalized === ',') {
+                        setForm(f => ({ ...f, amount: undefined }));
+                        return;
+                      }
+                      const num = Number(normalized);
+                      if (!isNaN(num)) setForm(f => ({ ...f, amount: num }));
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#475569', marginBottom:8 }}>Category</label>
+                  <div style={{ position:'relative' }}>
+                    <div style={{
+                      position:'absolute', left:16, top:'50%', transform:'translateY(-50%)',
+                      width:12, height:12, borderRadius:'50%', background: catColorMap[form.category || 'Uncategorized'],
+                      pointerEvents:'none', zIndex:1
+                    }} />
+                    <select 
+                      value={form.category || 'Uncategorized'} 
+                      onChange={e=>setForm(f=>({ ...f, category: e.target.value }))}
+                      style={{ paddingLeft:40 }}
+                    >
+                      {categoryNames.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={async ()=>{
+                  await onAdd();
+                  setShowAdd(false);
+                }}
+                style={{ marginTop:16, width:'100%', background:'linear-gradient(135deg, #10b981 0%, #059669 100%)', color:'#fff' }}
+              >
+                💾 Save Transaction
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Import Section */}
         <div className="card" style={{ padding: 24, marginBottom: 24 }}>
