@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import Chart from 'chart.js/auto';
@@ -69,6 +70,11 @@ const DEFAULT_PALETTE = [
   '#10b981','#3b82f6','#f59e0b','#8b5cf6','#ef4444','#06b6d4',
   '#ec4899','#84cc16','#f97316','#6366f1','#14b8a6','#a855f7'
 ];
+
+const supa = createClient(
+  import.meta.env.VITE_SUPABASE_URL as string,
+  import.meta.env.VITE_SUPABASE_ANON_KEY as string
+);
 
 function colorFor(_category: string, orderIndex: number, colorFromDb?: string | null) {
   if (colorFromDb && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(colorFromDb)) return colorFromDb;
@@ -243,11 +249,10 @@ export default function Tracker() {
   async function joinHouseholdById() {
     try {
       if (!joinId.trim()) { alert('Enter a household ID to join.'); return; }
-      const { supabase } = await import('../supabase');
-      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      const { data: userData, error: userErr } = await supa.auth.getUser();
       if (userErr || !userData?.user?.id) throw new Error('Not signed in.');
       const myId = userData.user.id;
-      const { error } = await supabase.from('household_members').insert({
+      const { error } = await supa.from('household_members').insert({
         household_id: joinId.trim(),
         user_id: myId,
         role: 'member'
